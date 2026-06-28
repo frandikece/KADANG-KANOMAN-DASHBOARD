@@ -283,3 +283,11 @@ tbody tr:hover td{background:var(--sf2)}
   .arisan-wheel-container{justify-content:center}
   #arisan-canvas{width:280px;height:280px}
 }
+
+/* ── PAYMENT TOGGLE ── */
+.pay-toggle{position:relative;display:inline-flex;align-items:center;cursor:pointer}
+.pay-toggle input{opacity:0;width:0;height:0;position:absolute}
+.pay-toggle-track{width:36px;height:20px;background:var(--bd2);border-radius:20px;transition:background .2s;position:relative;flex-shrink:0}
+.pay-toggle-track::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.pay-toggle input:checked + .pay-toggle-track{background:var(--ok)}
+.pay-toggle input:checked + .pay-toggle-track::after{transform:translateX(16px)}
