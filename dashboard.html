@@ -89,10 +89,8 @@ function renderSidebar() {
     { id:'notulen',   icon:'📝', label:'Riwayat Rapat' },
     { id:'kas',       icon:'💰', label:'Transparansi Kas' },
   ];
-  const isBend = CU.role === 'admin' || CU.role === 'bendahara';
-  if (isBend) {
-    pages.push({ id:'arisan', icon:'🎡', label:'Arisan', section:'Keuangan' });
-  }
+  // Arisan visible to all, but only admin/bendahara can spin
+  pages.push({ id:'arisan', icon:'🎡', label:'Sistem Arisan' });
   if (isAdmin) {
     pages.push({ id:'anggota',       icon:'👥', label:'Data Anggota', section:'Admin' });
     pages.push({ id:'absensi_rekap', icon:'📊', label:'Rekap Absensi' });

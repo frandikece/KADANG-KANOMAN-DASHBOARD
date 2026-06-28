@@ -748,152 +748,290 @@ window.dlKas = async function(el) {
 // ── ARISAN ─────────────────────────────────────────────────────
 export function rArisan(CU, CA) {
   const canEdit = CU.role === 'admin' || CU.role === 'bendahara';
-  if (!canEdit) return '<div class="empty-state"><span class="ic">🔒</span><h3>Akses Terbatas</h3><p>Hanya Admin dan Bendahara yang dapat mengakses fitur ini.</p></div>';
-
   const ar = CA.arisan || [];
   const belumMenang = ar.filter(a => !a.menang);
   const sudahMenang = ar.filter(a =>  a.menang).sort((a,b) => new Date(b.tgl_menang||0)-new Date(a.tgl_menang||0));
-  const totalPeserta = ar.length;
   const nominal = ar[0]?.nominal || 0;
+
+  // Store canEdit for use in spin functions
+  window._arisanCanEdit = canEdit;
 
   return `
   <div class="flex items-center justify-between mb-1">
     <h2 class="sec-title" style="margin:0">🎡 Sistem Arisan</h2>
-    ${canEdit ? `<div class="flex" style="gap:.5rem">
-      <button class="btn btn-o btn-sm" onclick="window.mArisanPeserta()">👤 Kelola Peserta</button>
-    </div>` : ''}
+    ${canEdit ? `<button class="btn btn-o btn-sm" onclick="window.mArisanPeserta()">👤 Kelola Peserta</button>` : ''}
   </div>
 
-  <!-- STATS -->
   <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))">
-    <div class="stat-card"><div class="stat-icon" style="background:#ede9fe">👥</div><div class="stat-val">${totalPeserta}</div><div class="stat-label">Total Peserta</div></div>
+    <div class="stat-card"><div class="stat-icon" style="background:#ede9fe">👥</div><div class="stat-val">${ar.length}</div><div class="stat-label">Total Peserta</div></div>
     <div class="stat-card"><div class="stat-icon" style="background:#d1fae5">✅</div><div class="stat-val">${sudahMenang.length}</div><div class="stat-label">Sudah Menang</div></div>
     <div class="stat-card"><div class="stat-icon" style="background:#fee2e2">⏳</div><div class="stat-val">${belumMenang.length}</div><div class="stat-label">Belum Menang</div></div>
-    <div class="stat-card"><div class="stat-icon" style="background:#fef3c7">💰</div><div class="stat-val" style="font-size:.95rem">${fm(nominal)}</div><div class="stat-label">Nominal Arisan</div></div>
+    <div class="stat-card"><div class="stat-icon" style="background:#fef3c7">💰</div><div class="stat-val" style="font-size:.9rem">${fm(nominal)}</div><div class="stat-label">Nominal</div></div>
   </div>
 
-  <!-- SPIN SECTION -->
-  <div class="card" style="margin-bottom:1rem;text-align:center">
-    <div class="card-header"><h3 class="card-title">🎡 Spin Pemenang</h3></div>
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-header"><h3 class="card-title">🎡 Roda Arisan</h3>
+      ${canEdit ? `<div class="flex" style="gap:.5rem">
+        <span style="font-size:.72rem;color:var(--tx2);align-self:center">Hanya Admin/Bendahara yang bisa memutar</span>
+      </div>` : `<span class="badge b-gr">👀 Hanya melihat</span>`}
+    </div>
+
     ${belumMenang.length === 0 ?
-      `<div class="empty-state" style="padding:1.5rem"><span class="ic">🎉</span><h3>Semua peserta sudah menang!</h3><p>Satu putaran arisan selesai. Reset untuk putaran berikutnya.</p></div>
-       ${canEdit ? `<button class="btn btn-o btn-sm" style="margin-top:.5rem" onclick="window.resetArisan()">🔄 Reset Putaran Baru</button>` : ''}` :
-      `<div class="arisan-wheel-wrap">
-        <div class="arisan-display" id="arisan-display">
-          <div class="arisan-display-name" id="arisan-name">?</div>
-          <div class="arisan-display-sub" id="arisan-sub">Tekan SPIN untuk memulai</div>
+      `<div class="empty-state" style="padding:1.5rem">
+        <span class="ic">🎉</span><h3>Semua peserta sudah menang!</h3>
+        <p>Satu putaran arisan selesai.</p>
+        ${canEdit ? `<button class="btn btn-o btn-sm" style="margin-top:.75rem" onclick="window.resetArisan()">🔄 Reset Putaran Baru</button>` : ''}
+      </div>` :
+      `<div class="arisan-stage">
+        <!-- WHEEL CANVAS -->
+        <div class="arisan-wheel-container">
+          <div class="arisan-pointer">▼</div>
+          <canvas id="arisan-canvas" width="340" height="340"></canvas>
+          <div class="arisan-center-circle">ARISAN</div>
         </div>
-        <button class="arisan-spin-btn" id="spin-btn" onclick="window.doSpin()">
-          <span id="spin-label">🎡 SPIN</span>
-        </button>
+
+        <!-- RIGHT PANEL -->
+        <div class="arisan-panel">
+          <div class="arisan-result-display" id="ar-display">
+            <div class="ar-disp-icon">🎡</div>
+            <div class="ar-disp-title">Siap Berputar</div>
+            <div class="ar-disp-sub">Tekan SPIN untuk memilih pemenang</div>
+          </div>
+
+          ${canEdit ? `
+          <button class="arisan-spin-btn" id="spin-btn" onclick="window.doSpin()">
+            🎡 PUTAR RODA
+          </button>
+          <div id="arisan-actions" style="display:none;margin-top:.75rem">
+            <div style="font-size:.8rem;color:var(--tx2);margin-bottom:.6rem;text-align:center">Pemenang terpilih. Pilih tindakan:</div>
+            <div class="flex" style="gap:.5rem;justify-content:center;flex-wrap:wrap">
+              <button class="btn btn-ok" onclick="window.ambilArisan()">✅ Ambil Arisan</button>
+              <button class="btn btn-o" onclick="window.kasihLain()">🔄 Kasih ke Orang Lain</button>
+            </div>
+          </div>` :
+          `<div style="text-align:center;padding:.75rem;background:var(--sf2);border-radius:var(--r);font-size:.82rem;color:var(--tx2)">
+            👀 Menunggu Admin/Bendahara memutar roda...
+          </div>`}
+
+          <div style="margin-top:1rem">
+            <div style="font-size:.72rem;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">Belum Menang (${belumMenang.length})</div>
+            <div style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:.2rem">
+              ${belumMenang.sort((a,b)=>a.nama.localeCompare(b.nama)).map(p =>
+                `<div class="arisan-peserta-chip" id="chip-${p.id}">⏳ ${esc(p.nama)}</div>`
+              ).join('')}
+            </div>
+          </div>
+        </div>
       </div>
-      <div id="arisan-result" style="display:none;margin-top:1.25rem">
-        <div style="font-size:.85rem;color:var(--tx2);margin-bottom:.75rem">Pemenang terpilih:</div>
-        <div style="font-size:1.3rem;font-weight:700;font-family:Poppins,sans-serif;color:var(--pr);margin-bottom:1rem" id="winner-name"></div>
-        <div class="flex" style="gap:.75rem;justify-content:center;flex-wrap:wrap">
-          <button class="btn btn-ok" onclick="window.ambilArisan()">✅ Ambil Arisan</button>
-          <button class="btn btn-o" onclick="window.kasihLain()">🔄 Kasih ke Orang Lain</button>
-        </div>
-      </div>`
+
+      <script>
+        // Init wheel after DOM ready
+        setTimeout(() => window.initWheel(), 100);
+      <\/script>`
     }
   </div>
 
-  <!-- DATA PESERTA -->
   <div class="card" style="padding:0">
     <div style="padding:.82rem 1rem;border-bottom:1px solid var(--bd)"><h3 class="card-title">📋 Data Peserta Arisan</h3></div>
-    ${!ar.length ? '<div class="empty-state"><span class="ic">👥</span><h3>Belum ada peserta</h3><p>Tambahkan peserta arisan terlebih dahulu.</p></div>' :
+    ${!ar.length ? '<div class="empty-state"><span class="ic">👥</span><h3>Belum ada peserta</h3></div>' :
     `<div class="table-wrap"><table>
-      <thead><tr><th>#</th><th>Nama Peserta</th><th>Nominal</th><th>Status</th><th>Tanggal Menang</th>${canEdit?'<th>Aksi</th>':''}</tr></thead>
-      <tbody>${ar.sort((a,b)=>a.nama.localeCompare(b.nama)).map((p,i) => `<tr>
+      <thead><tr><th>#</th><th>Nama</th><th>Nominal</th><th>Status</th><th>Tgl Menang</th>${canEdit?'<th>Aksi</th>':''}</tr></thead>
+      <tbody>${[...ar].sort((a,b)=>a.nama.localeCompare(b.nama)).map((p,i) => `<tr>
         <td style="color:var(--tx2)">${i+1}</td>
         <td><div class="flex items-center" style="gap:.4rem">
-          ${p.menang ? '✅' : '⏳'}
-          <span style="font-weight:500${p.menang?';text-decoration:line-through;opacity:.6':''}">${esc(p.nama)}</span>
+          ${p.menang?'✅':'⏳'}
+          <span style="font-weight:500${p.menang?';text-decoration:line-through;opacity:.55':''}">
+            ${esc(p.nama)}
+          </span>
         </div></td>
         <td>${fm(p.nominal||0)}</td>
-        <td>${p.menang ?
-          '<span class="badge b-ok">Sudah Menang</span>' :
-          '<span class="badge b-pr">Belum Menang</span>'}</td>
-        <td style="font-size:.78rem;color:var(--tx2)">${p.tgl_menang ? fd(p.tgl_menang) : '-'}</td>
-        ${canEdit ? `<td><div class="flex" style="gap:.28rem">
-          ${p.menang ?
-            `<button class="btn btn-o btn-xs" onclick="window.unmenang('${p.id}')">↩️</button>` :
-            `<button class="btn btn-ok btn-xs" onclick="window.manualMenang('${p.id}')">✅</button>`}
+        <td>${p.menang?'<span class="badge b-ok">Sudah Menang</span>':'<span class="badge b-pr">Belum Menang</span>'}</td>
+        <td style="font-size:.78rem;color:var(--tx2)">${p.tgl_menang?fd(p.tgl_menang):'-'}</td>
+        ${canEdit?`<td><div class="flex" style="gap:.28rem">
+          ${p.menang
+            ?`<button class="btn btn-o btn-xs" onclick="window.unmenang('${p.id}')">↩️</button>`
+            :`<button class="btn btn-ok btn-xs" onclick="window.manualMenang('${p.id}')">✅</button>`}
           <button class="btn btn-er btn-xs" onclick="window.dlPeserta('${p.id}')">🗑️</button>
-        </div></td>` : ''}
+        </div></td>`:''}
       </tr>`).join('')}</tbody>
     </table></div>`}
   </div>`;
 }
 
-// Spin logic
+// ── WHEEL LOGIC ────────────────────────────────────────────────
 let _spinWinner = null;
+let _spinning   = false;
+const WHEEL_COLORS = [
+  '#1a56db','#0e9f6e','#e02424','#c27803',
+  '#7e3af2','#ff6b35','#0891b2','#be185d',
+  '#059669','#dc2626','#7c3aed','#d97706',
+  '#0284c7','#db2777','#16a34a','#ea580c'
+];
 
-window.doSpin = async function() {
+window.initWheel = function() {
+  const canvas = document.getElementById('arisan-canvas');
+  if (!canvas) return;
   const belum = (window.CA.arisan||[]).filter(a => !a.menang);
-  if (!belum.length) { toast('Semua sudah menang!','inf'); return; }
+  if (!belum.length) return;
+  window._wheelData = belum;
+  window._wheelAngle = 0;
+  drawWheel(canvas, belum, 0);
+};
 
+function drawWheel(canvas, items, angle) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H/2, r = W/2 - 8;
+  const n = items.length;
+  const slice = (2 * Math.PI) / n;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Draw shadow
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,.25)';
+  ctx.shadowBlur = 18;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, 2*Math.PI);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.restore();
+
+  items.forEach((item, i) => {
+    const startAngle = angle + i * slice;
+    const endAngle   = startAngle + slice;
+    const color = WHEEL_COLORS[i % WHEEL_COLORS.length];
+
+    // Slice
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, startAngle, endAngle);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.6)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Text
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(startAngle + slice / 2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${n > 12 ? 10 : n > 8 ? 12 : 14}px Poppins, sans-serif`;
+    ctx.shadowColor = 'rgba(0,0,0,.4)';
+    ctx.shadowBlur = 3;
+    // Truncate long names
+    let name = item.nama;
+    if (name.length > 14) name = name.substr(0,13)+'…';
+    ctx.fillText(name, r - 12, 5);
+    ctx.restore();
+  });
+
+  // Center circle
+  ctx.beginPath();
+  ctx.arc(cx, cy, 26, 0, 2*Math.PI);
+  ctx.fillStyle = '#0f2744';
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+}
+
+window.doSpin = function() {
+  if (_spinning) return;
+  const canvas = document.getElementById('arisan-canvas');
+  const belum = (window.CA.arisan||[]).filter(a => !a.menang);
+  if (!canvas || !belum.length) return;
+
+  // Hide actions, update display
+  const actEl = document.getElementById('arisan-actions');
+  const dispEl = document.getElementById('ar-display');
   const btn = document.getElementById('spin-btn');
-  const nameEl = document.getElementById('arisan-name');
-  const subEl = document.getElementById('arisan-sub');
-  const resultEl = document.getElementById('arisan-result');
-  if (!btn) return;
+  if (actEl) actEl.style.display = 'none';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Berputar...'; }
+  if (dispEl) dispEl.innerHTML = `<div class="ar-disp-icon spin-icon">🎡</div><div class="ar-disp-title">Berputar...</div><div class="ar-disp-sub">Menentukan pemenang...</div>`;
 
-  // Hide result
-  if (resultEl) resultEl.style.display = 'none';
-  btn.disabled = true;
-  document.getElementById('spin-label').textContent = '⏳ Memutar...';
+  _spinning = true;
+  _spinWinner = null;
 
-  // Animate - cycle through names
-  let count = 0;
-  const totalFrames = 30;
-  const interval = setInterval(() => {
-    const rand = belum[Math.floor(Math.random()*belum.length)];
-    if (nameEl) nameEl.textContent = rand.nama;
-    if (subEl) subEl.textContent = '🎲 Memutar...';
-    count++;
-    if (count >= totalFrames) {
-      clearInterval(interval);
-      // Pick final winner
-      _spinWinner = belum[Math.floor(Math.random()*belum.length)];
-      if (nameEl) nameEl.textContent = _spinWinner.nama;
-      if (subEl) subEl.textContent = '🎉 Pemenang terpilih!';
-      if (resultEl) {
-        resultEl.style.display = 'block';
-        document.getElementById('winner-name').textContent = _spinWinner.nama;
+  // Pick winner
+  const winner = belum[Math.floor(Math.random() * belum.length)];
+  const winnerIdx = belum.indexOf(winner);
+  const n = belum.length;
+  const slice = (2 * Math.PI) / n;
+
+  // Calculate target angle so pointer (top = -PI/2) lands on winner
+  const targetSliceCenter = winnerIdx * slice + slice / 2;
+  const targetAngle = -Math.PI/2 - targetSliceCenter;
+  const extraSpins = (5 + Math.floor(Math.random()*3)) * 2 * Math.PI;
+  const finalAngle = targetAngle + extraSpins;
+
+  // Animate
+  const duration = 4000;
+  const start = performance.now();
+  const startAngle = window._wheelAngle || 0;
+
+  function easeOut(t) {
+    return 1 - Math.pow(1 - t, 4);
+  }
+
+  function animate(now) {
+    const elapsed = now - start;
+    const progress = Math.min(elapsed / duration, 1);
+    const current = startAngle + (finalAngle - startAngle) * easeOut(progress);
+    window._wheelAngle = current;
+
+    drawWheel(canvas, belum, current);
+
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      // Done!
+      _spinning = false;
+      _spinWinner = winner;
+
+      // Highlight winner chip
+      document.querySelectorAll('.arisan-peserta-chip').forEach(c => c.classList.remove('winner'));
+      const chip = document.getElementById('chip-'+winner.id);
+      if (chip) { chip.classList.add('winner'); chip.scrollIntoView({behavior:'smooth',block:'nearest'}); }
+
+      // Update display
+      if (dispEl) {
+        dispEl.innerHTML = `
+          <div class="ar-disp-icon">🎉</div>
+          <div class="ar-disp-title">${esc(winner.nama)}</div>
+          <div class="ar-disp-sub">Pemenang Arisan!</div>`;
       }
-      btn.disabled = false;
-      document.getElementById('spin-label').textContent = '🎡 SPIN LAGI';
+      if (actEl) actEl.style.display = 'block';
+      if (btn) { btn.disabled = false; btn.textContent = '🎡 PUTAR LAGI'; }
     }
-  }, 80);
+  }
+
+  requestAnimationFrame(animate);
 };
 
 window.ambilArisan = async function() {
   if (!_spinWinner) return;
-  if (!confirm(`${_spinWinner.nama} mengambil arisan sebesar ${fm(_spinWinner.nominal||0)}?`)) return;
+  if (!confirm(`${_spinWinner.nama} mengambil arisan ${fm(_spinWinner.nominal||0)}?`)) return;
   try {
     await fbUp('arisan', _spinWinner.id, { menang:true, tgl_menang:new Date().toISOString().split('T')[0] });
     toast(_spinWinner.nama+' berhasil dicatat sebagai pemenang!','ok');
     _spinWinner = null;
-    const resultEl = document.getElementById('arisan-result');
-    if (resultEl) resultEl.style.display = 'none';
-    const nameEl = document.getElementById('arisan-name');
-    if (nameEl) nameEl.textContent = '?';
-    const subEl = document.getElementById('arisan-sub');
-    if (subEl) subEl.textContent = 'Tekan SPIN untuk memulai';
-    const spinLabel = document.getElementById('spin-label');
-    if (spinLabel) spinLabel.textContent = '🎡 SPIN';
   } catch(e) { toast('Gagal','er'); }
 };
 
 window.kasihLain = function() {
   if (!_spinWinner) return;
-  toast(_spinWinner.nama+' melewati giliran. Spin lagi!','inf');
+  toast(_spinWinner.nama+' melewati giliran. Spin ulang!','inf');
   _spinWinner = null;
-  const resultEl = document.getElementById('arisan-result');
-  if (resultEl) resultEl.style.display = 'none';
-  // Auto spin again after brief delay
-  setTimeout(() => window.doSpin(), 500);
+  const actEl = document.getElementById('arisan-actions');
+  if (actEl) actEl.style.display = 'none';
+  const dispEl = document.getElementById('ar-display');
+  if (dispEl) dispEl.innerHTML = `<div class="ar-disp-icon">🎡</div><div class="ar-disp-title">Siap Berputar</div><div class="ar-disp-sub">Tekan SPIN untuk memilih pemenang</div>`;
+  document.querySelectorAll('.arisan-peserta-chip').forEach(c => c.classList.remove('winner'));
+  setTimeout(() => window.doSpin(), 600);
 };
 
 window.manualMenang = async function(id) {
@@ -902,24 +1040,20 @@ window.manualMenang = async function(id) {
   try { await fbUp('arisan',id,{menang:true,tgl_menang:new Date().toISOString().split('T')[0]}); toast('Berhasil','ok'); }
   catch(e) { toast('Gagal','er'); }
 };
-
 window.unmenang = async function(id) {
   const p = (window.CA.arisan||[]).find(x=>x.id===id);
   if (!p || !confirm(`Batalkan kemenangan ${p.nama}?`)) return;
   try { await fbUp('arisan',id,{menang:false,tgl_menang:null}); toast('Dibatalkan','ok'); }
   catch(e) { toast('Gagal','er'); }
 };
-
 window.dlPeserta = async function(id) {
   if (!confirm('Hapus peserta ini?')) return;
   try { await fbDel('arisan',id); toast('Dihapus','ok'); } catch(e) { toast('Gagal','er'); }
 };
-
 window.resetArisan = async function() {
-  if (!confirm('Reset semua status menang? Semua peserta akan kembali ke "Belum Menang".')) return;
+  if (!confirm('Reset semua status menang? Semua peserta kembali ke "Belum Menang".')) return;
   try {
-    const ar = window.CA.arisan || [];
-    for (const a of ar) await fbUp('arisan',a.id,{menang:false,tgl_menang:null});
+    for (const a of window.CA.arisan||[]) await fbUp('arisan',a.id,{menang:false,tgl_menang:null});
     toast('Putaran baru dimulai!','ok');
   } catch(e) { toast('Gagal','er'); }
 };
@@ -929,43 +1063,38 @@ window.mArisanPeserta = function() {
   const nominal = ar[0]?.nominal || 0;
   modal('👤 Kelola Peserta Arisan',
     `<div class="fg"><label>Nominal Arisan (Rp)</label><input id="ar-nom" type="number" placeholder="100000" value="${nominal}" min="0"></div>
-     <div class="fg"><label>Tambah Peserta Baru</label>
+     <div class="fg"><label>Tambah Peserta</label>
        <div class="flex" style="gap:.4rem">
          <input id="ar-nama" placeholder="Nama peserta" style="flex:1;padding:.58rem .82rem;border:1.5px solid var(--bd);border-radius:var(--r);background:var(--sf);color:var(--tx);font-size:.875rem">
          <button class="btn btn-p btn-sm" onclick="window.addPeserta()">+ Tambah</button>
        </div>
      </div>
-     <div style="font-size:.78rem;color:var(--tx2);margin-bottom:.5rem">Peserta terdaftar (${ar.length}):</div>
-     <div id="peserta-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--bd);border-radius:var(--r);padding:.5rem">
-       ${!ar.length ? '<div style="font-size:.8rem;color:var(--tx2);text-align:center;padding:.5rem">Belum ada peserta</div>' :
-         ar.sort((a,b)=>a.nama.localeCompare(b.nama)).map(p =>
-           `<div class="flex items-center justify-between" style="padding:.3rem .5rem;border-radius:6px;margin-bottom:2px;background:var(--sf2)">
-             <span style="font-size:.82rem">${esc(p.nama)} ${p.menang?'✅':''}</span>
-             <button class="btn btn-er btn-xs" onclick="window.dlPesertaInline('${p.id}',this)">✕</button>
-           </div>`
-         ).join('')}
+     <div style="font-size:.78rem;color:var(--tx2);margin-bottom:.45rem">Peserta terdaftar (${ar.length}):</div>
+     <div id="peserta-list" style="max-height:180px;overflow-y:auto;border:1px solid var(--bd);border-radius:var(--r);padding:.45rem">
+       ${!ar.length
+         ? '<div style="font-size:.8rem;color:var(--tx2);text-align:center;padding:.5rem">Belum ada peserta</div>'
+         : [...ar].sort((a,b)=>a.nama.localeCompare(b.nama)).map(p =>
+             `<div class="flex items-center justify-between" style="padding:.3rem .5rem;border-radius:6px;margin-bottom:2px;background:var(--sf2)">
+               <span style="font-size:.82rem">${esc(p.nama)} ${p.menang?'✅':''}</span>
+               <button class="btn btn-er btn-xs" onclick="window.dlPesertaInline('${p.id}',this)">✕</button>
+             </div>`
+           ).join('')}
      </div>
-     <div style="font-size:.72rem;color:var(--tx2);margin-top:.4rem">
-       Anda juga bisa import dari Data Anggota:
-       <button class="btn btn-o btn-xs" style="margin-left:.3rem" onclick="window.importDariAnggota()">Import Anggota</button>
+     <div style="font-size:.72rem;color:var(--tx2);margin-top:.5rem">
+       <button class="btn btn-o btn-xs" onclick="window.importDariAnggota()">⬇️ Import dari Data Anggota</button>
      </div>`,
     null,
-    async () => {
-      toast('Peserta tersimpan','ok'); return true;
-    }
+    async () => { toast('Selesai','ok'); return true; }
   );
 };
-
 window.addPeserta = async function() {
   const nama = document.getElementById('ar-nama')?.value.trim();
-  const nom = Number(document.getElementById('ar-nom')?.value) || 0;
+  const nom = Number(document.getElementById('ar-nom')?.value)||0;
   if (!nama) { toast('Nama wajib diisi','er'); return; }
   try {
     const id = await fbAdd('arisan',{nama,nominal:nom,menang:false,tgl_menang:null});
-    // Update nominal for all existing if changed
     const ar = window.CA.arisan||[];
     for (const a of ar) if(a.nominal!==nom) await fbUp('arisan',a.id,{nominal:nom});
-    // Refresh list in modal
     const list = document.getElementById('peserta-list');
     if (list) {
       const div = document.createElement('div');
@@ -978,22 +1107,20 @@ window.addPeserta = async function() {
     toast(nama+' ditambahkan','ok');
   } catch(e) { toast('Gagal','er'); }
 };
-
 window.dlPesertaInline = async function(id, btn) {
   try { await fbDel('arisan',id); btn.closest('div').remove(); toast('Dihapus','ok'); }
   catch(e) { toast('Gagal','er'); }
 };
-
 window.importDariAnggota = async function() {
   const users = window.CA.users;
   const existing = (window.CA.arisan||[]).map(a=>a.nama.toLowerCase());
   const nom = Number(document.getElementById('ar-nom')?.value)||0;
   const toAdd = users.filter(u=>!existing.includes(u.nama.toLowerCase()));
   if (!toAdd.length) { toast('Semua anggota sudah terdaftar','inf'); return; }
-  if (!confirm(`Import ${toAdd.length} anggota sebagai peserta arisan?`)) return;
+  if (!confirm(`Import ${toAdd.length} anggota?`)) return;
   try {
     for (const u of toAdd) await fbAdd('arisan',{nama:u.nama,nominal:nom,menang:false,tgl_menang:null});
-    toast(`${toAdd.length} anggota berhasil diimport!`,'ok');
+    toast(`${toAdd.length} anggota diimport!`,'ok');
     document.querySelector('.mo')?.remove();
   } catch(e) { toast('Gagal','er'); }
 };

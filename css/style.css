@@ -259,12 +259,27 @@ tbody tr:hover td{background:var(--sf2)}
   .cal-top{padding:.9rem 1rem}
 }
 
-/* ── ARISAN ── */
-.arisan-wheel-wrap{display:flex;flex-direction:column;align-items:center;gap:1.25rem;padding:1.25rem 0}
-.arisan-display{width:100%;max-width:340px;min-height:110px;background:linear-gradient(135deg,#0f2744,#1a56db);border-radius:var(--rl);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.25rem;box-shadow:0 8px 24px rgba(26,86,219,.35)}
-.arisan-display-name{font-family:Poppins,sans-serif;font-size:1.6rem;font-weight:700;color:#fff;text-align:center;line-height:1.2;min-height:2rem;transition:all .05s}
-.arisan-display-sub{font-size:.78rem;color:rgba(255,255,255,.65);margin-top:.4rem;text-align:center}
-.arisan-spin-btn{background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;border:none;border-radius:50px;padding:.85rem 2.5rem;font-size:1.05rem;font-weight:700;font-family:Poppins,sans-serif;cursor:pointer;box-shadow:0 4px 15px rgba(239,68,68,.4);transition:all .15s;letter-spacing:.02em}
-.arisan-spin-btn:hover{transform:scale(1.05);box-shadow:0 6px 20px rgba(239,68,68,.5)}
+/* ── ARISAN WHEEL ── */
+.arisan-stage{display:grid;grid-template-columns:auto 1fr;gap:1.5rem;align-items:start}
+.arisan-wheel-container{position:relative;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.arisan-pointer{position:absolute;top:-8px;left:50%;transform:translateX(-50%);font-size:1.5rem;z-index:10;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));line-height:1}
+#arisan-canvas{border-radius:50%;display:block;filter:drop-shadow(0 6px 20px rgba(0,0,0,.2))}
+.arisan-center-circle{position:absolute;width:52px;height:52px;background:#0f2744;border:3px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.5rem;font-weight:800;color:#fff;letter-spacing:.05em;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.arisan-panel{display:flex;flex-direction:column;gap:.9rem;min-width:0}
+.arisan-result-display{background:linear-gradient(135deg,#0f2744,#1a56db);border-radius:var(--rl);padding:1.25rem;text-align:center;color:#fff;min-height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ar-disp-icon{font-size:2rem;margin-bottom:.4rem}
+.ar-disp-title{font-family:Poppins,sans-serif;font-size:1.15rem;font-weight:700;line-height:1.2}
+.ar-disp-sub{font-size:.72rem;opacity:.7;margin-top:.3rem}
+.arisan-spin-btn{background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;border:none;border-radius:50px;padding:.8rem 1.5rem;font-size:.95rem;font-weight:700;font-family:Poppins,sans-serif;cursor:pointer;box-shadow:0 4px 15px rgba(239,68,68,.35);transition:all .15s;width:100%}
+.arisan-spin-btn:hover{transform:scale(1.03);box-shadow:0 6px 20px rgba(239,68,68,.5)}
 .arisan-spin-btn:active{transform:scale(.97)}
 .arisan-spin-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.arisan-peserta-chip{background:var(--sf2);border:1px solid var(--bd);border-radius:20px;padding:.28rem .75rem;font-size:.78rem;font-weight:500;transition:all .2s;color:var(--tx)}
+.arisan-peserta-chip.winner{background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;border-color:transparent;transform:scale(1.04);box-shadow:0 2px 8px rgba(239,68,68,.4);font-weight:700}
+.spin-icon{animation:spinIco .6s linear infinite}
+@keyframes spinIco{to{transform:rotate(360deg)}}
+@media(max-width:768px){
+  .arisan-stage{grid-template-columns:1fr}
+  .arisan-wheel-container{justify-content:center}
+  #arisan-canvas{width:280px;height:280px}
+}
