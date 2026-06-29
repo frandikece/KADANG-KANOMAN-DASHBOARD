@@ -832,6 +832,27 @@ function drawWheel(canvas, items, angle, highlightIdx = -1) {
   ctx.textBaseline = 'alphabetic';
 }
 
+// Init wheel - called after arisan page renders
+window.initArisanWheel = function() {
+  const canvas = document.getElementById('arisan-canvas');
+  if (!canvas) return;
+  const belum = (window.CA.arisan||[]).filter(a => !a.menang);
+  if (!belum.length) return;
+  window._wheelItems = belum;
+  if (!window._wheelAngle) window._wheelAngle = 0;
+  drawWheel(canvas, belum, window._wheelAngle);
+};
+
+// Init wheel — called after arisan page renders
+window.initArisanWheel = function() {
+  const canvas = document.getElementById('arisan-canvas');
+  if (!canvas) return;
+  const belum = (window.CA.arisan||[]).filter(a => !a.menang);
+  if (!belum.length) return;
+  if (!window._wheelAngle) window._wheelAngle = 0;
+  drawWheel(canvas, belum, window._wheelAngle);
+};
+
 export function rArisan(CU, CA) {
   const canEdit = CU.role === 'admin' || CU.role === 'bendahara';
   window._arisanCanEdit = canEdit;

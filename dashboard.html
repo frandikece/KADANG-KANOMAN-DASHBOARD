@@ -61,9 +61,7 @@
 
 <script type="module">
 import { getSession, clearSession, applyTheme, toggleTheme as tgTheme, fbSub, av, esc } from './js/firebase.js';
-import { renderPage, initPage, rArisan, initArisanWheel } from './js/app.js';
-window.rArisan = rArisan;
-window.initArisanWheel = initArisanWheel;
+import { renderPage, initPage } from './js/app.js';
 
 // ── THEME ──────────────────────────────────────────────────────
 let DK = applyTheme();
@@ -117,7 +115,16 @@ window.navigate = function(page) {
   window.currentPage = page;
   document.getElementById('page-title').textContent = titles[page] || 'Dashboard';
   renderSidebar();
-  renderPage(page, CU, window.CA || {});
+  if (page === 'arisan') {
+    // Load pertemuan first, then render + init wheel
+    const doRender = () => {
+      renderPage(page, CU, window.CA || {});
+      setTimeout(() => { if (window.initArisanWheel) window.initArisanWheel(); }, 100);
+    };
+    window.loadArisanPertemuan ? window.loadArisanPertemuan().then(doRender) : doRender();
+  } else {
+    renderPage(page, CU, window.CA || {});
+  }
   closeSidebar();
 };
 
@@ -137,35 +144,22 @@ cols.forEach(col => {
     if (loaded >= cols.length) {
       // All collections loaded at least once
       renderPage(window.currentPage, CU, window.CA);
-  // Init arisan page
+  // Init arisan page - load pertemuan first then re-render with wheel
   if (window.currentPage === 'arisan') {
-    // Load pertemuan then init wheel
-    window.loadArisanPertemuan && window.loadArisanPertemuan().then(() => {
-      renderPage(window.currentPage, window.CU, window.CA);
-      setTimeout(() => window.initArisanWheel && window.initArisanWheel(), 80);
-    });
+    if (window.loadArisanPertemuan) {
+      window.loadArisanPertemuan().then(() => {
+        renderPage(window.currentPage, window.CU, window.CA);
+        setTimeout(() => { if (window.initArisanWheel) window.initArisanWheel(); }, 100);
+      });
+    } else {
+      setTimeout(() => { if (window.initArisanWheel) window.initArisanWheel(); }, 100);
+    }
   }
     } else {
       // Re-render on every realtime update after initial load
       if (loaded > cols.length) renderPage(window.currentPage, CU, window.CA);
     }
   });
-});
-
-// ── SPIN STATE SYNC (real-time for all viewers) ───────────────
-import { fbSub as fbSubDoc2, db } from './js/firebase.js';
-import { onSnapshot, doc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-// Subscribe to spin_state document
-onSnapshot(doc(db, 'meta', 'spin_state'), snap => {
-  if (!snap.exists()) return;
-  const state = snap.data();
-  // Only mirror for non-admin viewers on arisan page
-  if (window.currentPage !== 'arisan') return;
-  if (window._arisanCanEdit) return; // admin handles own spin
-  // Trigger mirror spin for viewers
-  if (typeof window._handleSpinStateViewer === 'function') {
-    window._handleSpinStateViewer(state);
-  }
 });
 
 // ── BOOT ───────────────────────────────────────────────────────
