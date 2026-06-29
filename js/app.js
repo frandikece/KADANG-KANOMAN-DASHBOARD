@@ -910,424 +910,285 @@ export function rArisan(CU, CA) {
     }
   </div>
 
-  <!-- DATA TABLE -->
+  <!-- DATA TABLE: BUKU ARISAN STYLE -->
   <div class="card" style="padding:0;margin-bottom:1rem">
-    <div style="padding:.82rem 1rem;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between">
-      <h3 class="card-title">📋 Data & Pembayaran Peserta</h3>
-      ${canEdit ? `<div class="flex" style="gap:.4rem">
-        <button class="btn btn-o btn-xs" onclick="window.lihatRiwayatBayar()">📜 Riwayat Bayar</button>
-        <button class="btn btn-p btn-xs" onclick="window.tandaiBayarSemua()">✅ Tandai Semua Bayar Hari Ini</button>
-      </div>` : ''}
+    <div style="padding:.82rem 1rem;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem">
+      <h3 class="card-title">📒 Buku Arisan</h3>
+      <div class="flex" style="gap:.35rem;flex-wrap:wrap;align-items:center">
+        ${canEdit ? `
+          <button class="btn btn-p btn-xs" onclick="window.tambahPertemuan()">+ Pertemuan</button>
+          <button class="btn btn-o btn-xs" onclick="window.kelolaPertemuan()">⚙️ Pertemuan</button>` : ''}
+        <button class="btn btn-ok btn-xs" onclick="window.exportExcelArisan()">📊 Export Excel</button>
+      </div>
     </div>
+
     ${!ar.length
-      ? '<div class="empty-state"><span class="ic">👥</span><h3>Belum ada peserta</h3><p>Tambahkan peserta via tombol Kelola Peserta.</p></div>'
-      : `<div class="table-wrap"><table>
-          <thead>
-            <tr>
-              <th>#</th><th>Nama</th><th>Nominal</th>
-              <th>Bayar Hari Ini</th><th>Total Bayar</th>
-              <th>Status Arisan</th><th>Tgl Menang</th>
-              ${canEdit?'<th>Aksi</th>':''}
-            </tr>
-          </thead>
-          <tbody>${[...ar].sort((a,b)=>a.nama.localeCompare(b.nama)).map((p,i) => {
-            const todayStr = new Date().toISOString().split('T')[0];
-            const bayarHariIni = (p.riwayat_bayar||[]).some(b => b.tgl === todayStr);
-            const totalBayar = (p.riwayat_bayar||[]).length;
-            return `<tr>
-              <td style="color:var(--tx2)">${i+1}</td>
-              <td><div class="flex items-center" style="gap:.38rem">
-                ${p.menang ? '🏆' : '⏳'}
-                <span style="font-weight:500${p.menang?';opacity:.6':''}">${esc(p.nama)}</span>
-              </div></td>
-              <td style="font-size:.78rem">${fm(p.nominal||0)}</td>
-              <td>
-                ${canEdit
-                  ? `<label class="pay-toggle" title="${bayarHariIni?'Sudah bayar hari ini — klik untuk batal':'Belum bayar hari ini — klik untuk tandai'}">
-                      <input type="checkbox" ${bayarHariIni?'checked':''} onchange="window.toggleBayar('${p.id}',this.checked)">
-                      <span class="pay-toggle-track"></span>
-                    </label>`
-                  : bayarHariIni
-                    ? '<span class="badge b-ok">✅ Sudah</span>'
-                    : '<span class="badge b-er">❌ Belum</span>'}
-              </td>
-              <td>
-                <button class="btn btn-g btn-xs" onclick="window.lihatBayarPeserta('${p.id}')" style="font-size:.7rem">
-                  📋 ${totalBayar}x bayar
-                </button>
-              </td>
-              <td>${p.menang ? '<span class="badge b-ok">Sudah Menang</span>' : '<span class="badge b-pr">Belum Menang</span>'}</td>
-              <td style="font-size:.75rem;color:var(--tx2)">${p.tgl_menang ? fd(p.tgl_menang) : '-'}</td>
-              ${canEdit ? `<td><div class="flex" style="gap:.25rem">
+      ? '<div class="empty-state"><span class="ic">📒</span><h3>Belum ada peserta</h3><p>Tambahkan peserta terlebih dahulu.</p></div>'
+      : (() => {
+          // Get pertemuan list sorted
+          const pertemuan = [...(window._arisanPertemuan||[])].sort((a,b)=>a.ke-b.ke);
+          return '<div style="overflow-x:auto"><table class="arisan-book-table">'+
+          '<thead><tr>'+
+            '<th style="min-width:140px;position:sticky;left:0;background:var(--sf2);z-index:2">Nama Peserta</th>'+
+            '<th style="min-width:90px">Nominal</th>'+
+            pertemuan.map(pt =>
+              `<th style="min-width:80px;text-align:center">
+                <div style="font-size:.65rem;font-weight:700">Ke-${pt.ke}</div>
+                <div style="font-size:.6rem;color:var(--tx2);font-weight:400">${pt.tgl||''}</div>
+              </th>`
+            ).join('')+
+            '<th style="min-width:80px;text-align:center">Total Bayar</th>'+
+            '<th style="min-width:90px;text-align:center">Status</th>'+
+            (canEdit ? '<th style="min-width:60px">Aksi</th>' : '')+
+          '</tr></thead>'+
+          '<tbody>'+
+          [...ar].sort((a,b)=>a.nama.localeCompare(b.nama)).map(p => {
+            const bayarSet = new Set((p.riwayat_bayar||[]).map(b=>b.pertemuan_ke));
+            const totalBayar = bayarSet.size;
+            return '<tr>'+
+              `<td style="font-weight:500;position:sticky;left:0;background:var(--sf);z-index:1;white-space:nowrap">
+                ${p.menang ? '🏆' : '⏳'} ${esc(p.nama)}
+              </td>`+
+              `<td style="font-size:.75rem;text-align:center">${fm(p.nominal||0)}</td>`+
+              pertemuan.map(pt => {
+                const sudahBayar = bayarSet.has(pt.ke);
+                return `<td style="text-align:center;padding:.4rem">` +
+                  (canEdit
+                    ? `<label class="pay-toggle" title="${sudahBayar?'Sudah bayar — klik batal':'Belum bayar — klik tandai'}">
+                        <input type="checkbox" ${sudahBayar?'checked':''} onchange="window.toggleBayarPt('${p.id}',${pt.ke},this.checked)">
+                        <span class="pay-toggle-track"></span>
+                       </label>`
+                    : sudahBayar
+                      ? '<span style="font-size:1.1rem">✅</span>'
+                      : '<span style="font-size:1rem;opacity:.25">○</span>'
+                  ) + '</td>';
+              }).join('')+
+              `<td style="text-align:center;font-weight:600;color:var(--ok)">${totalBayar}/${pertemuan.length}</td>`+
+              `<td style="text-align:center">${p.menang
+                ? '<span class="badge b-ok" style="font-size:.62rem">Menang</span>'
+                : '<span class="badge b-pr" style="font-size:.62rem">Belum</span>'}
+              </td>`+
+              (canEdit ? `<td><div class="flex" style="gap:.2rem">
                 ${p.menang
                   ? `<button class="btn btn-o btn-xs" onclick="window.unmenang('${p.id}')">↩️</button>`
                   : `<button class="btn btn-ok btn-xs" onclick="window.manualMenang('${p.id}')">✅</button>`}
                 <button class="btn btn-er btn-xs" onclick="window.dlPeserta('${p.id}')">🗑️</button>
-              </div></td>` : ''}
-            </tr>`;
-          }).join('')}</tbody>
-        </table></div>`}
+              </div></td>` : '')+
+            '</tr>';
+          }).join('')+
+          // Summary row
+          '<tr style="background:var(--sf2);font-weight:600">'+
+            '<td style="position:sticky;left:0;background:var(--sf2)">TOTAL BAYAR</td>'+
+            '<td></td>'+
+            pertemuan.map(pt => {
+              const cnt = ar.filter(p=>(p.riwayat_bayar||[]).some(b=>b.pertemuan_ke===pt.ke)).length;
+              const total = cnt * (ar[0]?.nominal||0);
+              return `<td style="text-align:center;font-size:.72rem">
+                <div>${cnt}/${ar.length} org</div>
+                <div style="color:var(--ok)">${fm(total)}</div>
+              </td>`;
+            }).join('')+
+            `<td style="text-align:center;color:var(--ok)">${
+              ar.reduce((s,p)=>s+new Set((p.riwayat_bayar||[]).map(b=>b.pertemuan_ke)).size,0)
+            }x total</td>`+
+            '<td></td>'+
+            (canEdit ? '<td></td>' : '')+
+          '</tr>'+
+          '</tbody></table></div>';
+        })()
+    }
   </div>`;
 }
 
-// ── PEMBAYARAN ARISAN ─────────────────────────────────────────
-window.toggleBayar = async function(id, checked) {
-  const p = (window.CA.arisan||[]).find(x=>x.id===id);
-  if (!p) return;
-  const todayStr = new Date().toISOString().split('T')[0];
-  const riwayat = [...(p.riwayat_bayar||[])];
-
-  if (checked) {
-    // Tambah bayar hari ini
-    if (riwayat.some(b=>b.tgl===todayStr)) return; // sudah ada
-    riwayat.push({ tgl:todayStr, nominal:p.nominal||0, dicatat:new Date().toISOString() });
-    toast(p.nama+' ditandai sudah bayar hari ini ✅','ok');
-  } else {
-    // Hapus bayar hari ini
-    const idx = riwayat.findIndex(b=>b.tgl===todayStr);
-    if (idx > -1) riwayat.splice(idx, 1);
-    toast(p.nama+' — tanda bayar hari ini dibatalkan','inf');
-  }
-  try { await fbUp('arisan', id, { riwayat_bayar: riwayat }); }
-  catch(e) { toast('Gagal menyimpan','er'); }
+// ── PERTEMUAN ARISAN ──────────────────────────────────────────
+// Load pertemuan from Firebase arisan_meta
+window._arisanPertemuan = [];
+window.loadArisanPertemuan = async function() {
+  try {
+    const { fbGet } = await import('./firebase.js');
+    const list = await fbGet('arisan_pertemuan');
+    window._arisanPertemuan = list.sort((a,b)=>a.ke-b.ke);
+  } catch(e) { console.error('loadPertemuan error:',e); window._arisanPertemuan = []; }
 };
 
-window.tandaiBayarSemua = async function() {
-  const ar = window.CA.arisan||[];
-  if (!ar.length) { toast('Belum ada peserta','inf'); return; }
-  const todayStr = new Date().toISOString().split('T')[0];
-  const belumBayar = ar.filter(p => !(p.riwayat_bayar||[]).some(b=>b.tgl===todayStr));
-  if (!belumBayar.length) { toast('Semua sudah ditandai bayar hari ini','inf'); return; }
-  if (!confirm(`Tandai ${belumBayar.length} peserta sudah bayar hari ini (${fd(todayStr)})?`)) return;
-  try {
-    for (const p of belumBayar) {
-      const riwayat = [...(p.riwayat_bayar||[]), { tgl:todayStr, nominal:p.nominal||0, dicatat:new Date().toISOString() }];
-      await fbUp('arisan', p.id, { riwayat_bayar: riwayat });
+window.tambahPertemuan = async function() {
+  const existing = window._arisanPertemuan||[];
+  const nextKe = (existing.length ? Math.max(...existing.map(p=>p.ke)) : 0) + 1;
+  const tgl = new Date().toISOString().split('T')[0];
+  modal(`Tambah Pertemuan Ke-${nextKe}`,
+    `<div class="fg"><label>Tanggal Pertemuan</label><input id="pt-tgl" type="date" value="${tgl}"></div>
+     <div class="fg"><label>Keterangan (opsional)</label><input id="pt-ket" placeholder="Pertemuan rutin bulan ini..."></div>`,
+    null,
+    async () => {
+      const t = document.getElementById('pt-tgl').value;
+      const k = document.getElementById('pt-ket').value.trim();
+      if (!t) { toast('Tanggal wajib diisi','er'); return false; }
+      try {
+        const { fbAdd } = await import('./firebase.js');
+        const newId = await fbAdd('arisan_pertemuan', { ke:nextKe, tgl:t, ket:k });
+        window._arisanPertemuan.push({ id:newId, ke:nextKe, tgl:t, ket:k });
+        toast(`Pertemuan ke-${nextKe} ditambahkan!`,'ok');
+        return true;
+      } catch(e) { toast('Gagal','er'); return false; }
     }
-    toast(`${belumBayar.length} peserta ditandai sudah bayar!`,'ok');
-  } catch(e) { toast('Gagal','er'); }
+  );
 };
 
-window.lihatBayarPeserta = function(id) {
-  const p = (window.CA.arisan||[]).find(x=>x.id===id);
-  if (!p) return;
-  const riwayat = [...(p.riwayat_bayar||[])].sort((a,b)=>new Date(b.tgl)-new Date(a.tgl));
-  const totalBayar = riwayat.length * (p.nominal||0);
-  const canEdit = window._arisanCanEdit;
-
-  const rows = riwayat.length
-    ? riwayat.map((b,i) => `
-        <div class="flex items-center justify-between" style="padding:.45rem .6rem;border-radius:6px;background:var(--sf2);margin-bottom:.25rem">
+window.kelolaPertemuan = function() {
+  const pt = window._arisanPertemuan||[];
+  const rows = pt.length
+    ? pt.map(p => `
+        <div class="flex items-center justify-between" style="padding:.35rem .55rem;border-radius:6px;background:var(--sf2);margin-bottom:.25rem">
           <div>
-            <div style="font-size:.82rem;font-weight:500">${fd(b.tgl)}</div>
-            <div style="font-size:.7rem;color:var(--tx2)">Dicatat: ${new Date(b.dicatat||b.tgl).toLocaleString('id-ID')}</div>
+            <span style="font-weight:600;font-size:.82rem">Pertemuan ke-${p.ke}</span>
+            <span style="font-size:.75rem;color:var(--tx2);margin-left:.4rem">${fd(p.tgl)}</span>
+            ${p.ket?`<div style="font-size:.7rem;color:var(--tx2)">${esc(p.ket)}</div>`:''}
           </div>
-          <div class="flex items-center" style="gap:.4rem">
-            <span style="font-size:.8rem;font-weight:600;color:var(--ok)">${fm(b.nominal||p.nominal||0)}</span>
-            ${canEdit ? `<button class="btn btn-er btn-xs" onclick="window.hapusBayar('${p.id}','${b.tgl}')">✕</button>` : ''}
-          </div>
-        </div>`)
-    .join('')
-    : '<div style="text-align:center;font-size:.82rem;color:var(--tx2);padding:1rem">Belum ada riwayat pembayaran</div>';
+          <button class="btn btn-er btn-xs" onclick="window.hapusPertemuan('${p.id}',${p.ke},this)">🗑️</button>
+        </div>`).join('')
+    : '<div style="text-align:center;font-size:.82rem;color:var(--tx2);padding:.75rem">Belum ada pertemuan</div>';
 
-  modal(`💰 Riwayat Bayar — ${esc(p.nama)}`,
-    `<div class="flex items-center justify-between" style="margin-bottom:.75rem;padding:.6rem .8rem;background:var(--prl);border-radius:var(--r)">
-      <div style="font-size:.78rem;color:var(--prd)">Total ${riwayat.length}x bayar</div>
-      <div style="font-size:.9rem;font-weight:700;color:var(--prd)">${fm(totalBayar)}</div>
-    </div>
-    ${canEdit ? `<div style="margin-bottom:.6rem">
-      <div style="font-size:.72rem;color:var(--tx2);margin-bottom:.3rem">Tambah pembayaran manual:</div>
-      <div class="flex" style="gap:.4rem">
-        <input type="date" id="bayar-tgl" value="${new Date().toISOString().split('T')[0]}"
-          style="flex:1;padding:.4rem .6rem;border:1.5px solid var(--bd);border-radius:var(--r);background:var(--sf);color:var(--tx);font-size:.8rem">
-        <button class="btn btn-p btn-sm" onclick="window.tambahBayarManual('${p.id}')">+ Tambah</button>
-      </div>
-    </div>` : ''}
-    <div style="max-height:250px;overflow-y:auto">${rows}</div>`,
-    null, null
+  modal('⚙️ Kelola Pertemuan',
+    `<p style="font-size:.75rem;color:var(--tx2);margin-bottom:.75rem">Daftar pertemuan arisan. Hapus pertemuan juga menghapus data bayar terkait.</p>
+     <div style="max-height:300px;overflow-y:auto">${rows}</div>`,
+    null, async () => true
   );
 };
 
-window.tambahBayarManual = async function(pid) {
-  const p = (window.CA.arisan||[]).find(x=>x.id===pid); if(!p) return;
-  const tgl = document.getElementById('bayar-tgl')?.value;
-  if (!tgl) { toast('Pilih tanggal dulu','er'); return; }
-  const riwayat = [...(p.riwayat_bayar||[])];
-  if (riwayat.some(b=>b.tgl===tgl)) { toast('Sudah ada pembayaran di tanggal ini','inf'); return; }
-  riwayat.push({ tgl, nominal:p.nominal||0, dicatat:new Date().toISOString() });
+window.hapusPertemuan = async function(id, ke, btn) {
+  if (!confirm(`Hapus pertemuan ke-${ke}? Data bayar di pertemuan ini juga akan dihapus.`)) return;
   try {
-    await fbUp('arisan', pid, { riwayat_bayar: riwayat });
-    toast('Pembayaran ditambahkan!','ok');
-    document.querySelector('.mo')?.remove();
-    window.lihatBayarPeserta(pid);
-  } catch(e) { toast('Gagal','er'); }
-};
-
-window.hapusBayar = async function(pid, tgl) {
-  if (!confirm(`Hapus pembayaran tanggal ${fd(tgl)}?`)) return;
-  const p = (window.CA.arisan||[]).find(x=>x.id===pid); if(!p) return;
-  const riwayat = (p.riwayat_bayar||[]).filter(b=>b.tgl!==tgl);
-  try {
-    await fbUp('arisan', pid, { riwayat_bayar: riwayat });
-    toast('Pembayaran dihapus','ok');
-    document.querySelector('.mo')?.remove();
-    window.lihatBayarPeserta(pid);
-  } catch(e) { toast('Gagal','er'); }
-};
-
-window.lihatRiwayatBayar = function() {
-  const ar = window.CA.arisan||[];
-  const todayStr = new Date().toISOString().split('T')[0];
-  // Group all payments by date
-  const byDate = {};
-  ar.forEach(p => {
-    (p.riwayat_bayar||[]).forEach(b => {
-      if (!byDate[b.tgl]) byDate[b.tgl] = [];
-      byDate[b.tgl].push({ nama:p.nama, nominal:b.nominal||p.nominal||0 });
-    });
-  });
-  const dates = Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
-  const rows = dates.length
-    ? dates.map(tgl => {
-        const entries = byDate[tgl];
-        const total = entries.reduce((s,e)=>s+e.nominal,0);
-        return `<div style="margin-bottom:.75rem">
-          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--tx3);margin-bottom:.35rem;padding-bottom:.3rem;border-bottom:1px solid var(--bd)">
-            ${fd(tgl)} ${tgl===todayStr?'<span class="badge b-pr">Hari Ini</span>':''}
-          </div>
-          ${entries.map(e=>`
-            <div class="flex items-center justify-between" style="padding:.3rem .5rem;border-radius:6px;background:var(--sf2);margin-bottom:.18rem">
-              <span style="font-size:.8rem">${esc(e.nama)}</span>
-              <span style="font-size:.78rem;font-weight:600;color:var(--ok)">${fm(e.nominal)}</span>
-            </div>`).join('')}
-          <div class="flex justify-between items-center" style="margin-top:.3rem;padding:.25rem .5rem;font-size:.75rem;font-weight:600;color:var(--tx2)">
-            <span>${entries.length} peserta</span><span>Total: ${fm(total)}</span>
-          </div>
-        </div>`;
-      }).join('')
-    : '<div class="empty-state" style="padding:1.5rem"><span class="ic">📋</span><h3>Belum ada riwayat pembayaran</h3></div>';
-
-  // Grand total
-  let grandTotal = 0;
-  ar.forEach(p => { (p.riwayat_bayar||[]).forEach(b => { grandTotal += b.nominal||p.nominal||0; }); });
-
-  modal('📜 Riwayat Pembayaran Arisan',
-    `<div style="background:var(--prl);border-radius:var(--r);padding:.65rem .9rem;margin-bottom:.9rem;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:.78rem;color:var(--prd)">Grand Total Terkumpul</span>
-      <span style="font-size:1rem;font-weight:700;color:var(--prd)">${fm(grandTotal)}</span>
-    </div>
-    <div style="max-height:380px;overflow-y:auto">${rows}</div>`,
-    null, null
-  );
-};
-
-// Called after rArisan renders — init wheel immediately
-export function initArisanWheel() {
-  const canvas = document.getElementById('arisan-canvas');
-  if (!canvas) return;
-  const belum = (window.CA.arisan||[]).filter(a => !a.menang);
-  if (!belum.length) return;
-  window._wheelItems = belum;
-  window._wheelAngle = window._wheelAngle || 0;
-  drawWheel(canvas, belum, window._wheelAngle);
-
-  // Subscribe to spin_state in Firebase for real-time sync
-  if (_spinUnsub) _spinUnsub();
-  import('./firebase.js').then(({ db }) => {
-    const { onSnapshot, doc } = window._fbImports || {};
-    // Use fbSub-like pattern via window
-    _spinUnsub = window._fbSubDoc
-      ? window._fbSubDoc('spin_state', 'arisan', handleSpinState)
-      : null;
-  });
-}
-
-// Viewer handler — called from dashboard.html spin_state subscription
-window._handleSpinStateViewer = function(state) {
-  if (!state) return;
-  const canvas = document.getElementById('arisan-canvas');
-  const belum = (window.CA.arisan||[]).filter(a => !a.menang);
-  if (!canvas || !belum.length) return;
-  if (state.status === 'spinning' && !_spinning) {
-    const winner = belum.find(p => p.id === state.winner_id);
-    if (winner) _animateSpin(canvas, belum, winner, false);
-  } else if (state.status === 'done') {
-    const winner = belum.find(p => p.id === state.winner_id);
-    if (winner && !_spinning) showWinnerUI(winner, belum);
-  } else if (state.status === 'idle') {
-    const dispEl = document.getElementById('ar-display');
-    if (dispEl) dispEl.innerHTML = '<div class="ar-disp-icon">🎡</div><div class="ar-disp-title">Siap Berputar</div><div class="ar-disp-sub">Menunggu Admin/Bendahara memutar...</div>';
-    document.querySelectorAll('.arisan-peserta-chip').forEach(c=>c.classList.remove('winner'));
-    const actEl = document.getElementById('arisan-actions');
-    if (actEl) actEl.style.display = 'none';
-    if (canvas && belum.length) drawWheel(canvas, belum, window._wheelAngle||0);
-  }
-};
-
-// Handle incoming spin state from Firebase (for viewers)
-function handleSpinState(state) {
-  if (!state) return;
-  const canvas = document.getElementById('arisan-canvas');
-  const belum = (window.CA.arisan||[]).filter(a => !a.menang);
-  if (!canvas || !belum.length) return;
-
-  if (state.status === 'spinning' && !_spinning) {
-    // Mirror spin for viewers
-    window._arisanCanEdit ? null : mirrorSpin(canvas, belum, state);
-  } else if (state.status === 'done') {
-    const winner = belum.find(p => p.id === state.winner_id);
-    if (winner) showWinnerUI(winner, belum);
-  } else if (state.status === 'idle') {
-    const dispEl = document.getElementById('ar-display');
-    if (dispEl) dispEl.innerHTML = '<div class="ar-disp-icon">🎡</div><div class="ar-disp-title">Siap Berputar</div><div class="ar-disp-sub">Menunggu Admin/Bendahara memutar...</div>';
-    document.querySelectorAll('.arisan-peserta-chip').forEach(c => c.classList.remove('winner'));
-    const actEl = document.getElementById('arisan-actions');
-    if (actEl) actEl.style.display = 'none';
-    drawWheel(canvas, belum, window._wheelAngle || 0);
-  }
-}
-
-function mirrorSpin(canvas, belum, state) {
-  // Viewer mirrors the spin with same seed
-  const winner = belum.find(p => p.id === state.winner_id);
-  if (!winner) return;
-  _animateSpin(canvas, belum, winner, false);
-}
-
-function showWinnerUI(winner, belum) {
-  const dispEl = document.getElementById('ar-display');
-  if (dispEl) {
-    dispEl.innerHTML = `<div class="ar-disp-icon">🎉</div>
-      <div class="ar-disp-title">${esc(winner.nama)}</div>
-      <div class="ar-disp-sub">Pemenang Arisan!</div>`;
-  }
-  const actEl = document.getElementById('arisan-actions');
-  if (actEl) actEl.style.display = 'block';
-  document.querySelectorAll('.arisan-peserta-chip').forEach(c => c.classList.remove('winner'));
-  const chip = document.getElementById('chip-'+winner.id);
-  if (chip) { chip.classList.add('winner'); chip.scrollIntoView({behavior:'smooth',block:'nearest'}); }
-  const canvas = document.getElementById('arisan-canvas');
-  if (canvas) {
-    const idx = belum.indexOf(winner);
-    drawWheel(canvas, belum, window._wheelAngle || 0, idx);
-  }
-}
-
-function _animateSpin(canvas, belum, winner, isAdmin) {
-  _spinning = true;
-  const n = belum.length;
-  const slice = (2 * Math.PI) / n;
-  const winnerIdx = belum.indexOf(winner);
-  const targetSliceCenter = winnerIdx * slice + slice / 2;
-  const targetAngle = -Math.PI/2 - targetSliceCenter;
-  const extraSpins = (6 + Math.floor(Math.random()*3)) * 2 * Math.PI;
-  const finalAngle = targetAngle + extraSpins;
-  const duration = 4500;
-  const startT = performance.now();
-  const startAngle = window._wheelAngle || 0;
-
-  const easeOut = t => 1 - Math.pow(1 - t, 4);
-
-  const frame = now => {
-    const p = Math.min((now - startT) / duration, 1);
-    const cur = startAngle + (finalAngle - startAngle) * easeOut(p);
-    window._wheelAngle = cur;
-    drawWheel(canvas, belum, cur);
-    if (p < 1) {
-      requestAnimationFrame(frame);
-    } else {
-      _spinning = false;
-      _spinWinner = winner;
-      showWinnerUI(winner, belum);
-      if (isAdmin) {
-        const btn = document.getElementById('spin-btn');
-        if (btn) { btn.disabled = false; btn.textContent = '🎡 PUTAR LAGI'; }
+    const { fbDel, fbUp } = await import('./firebase.js');
+    await fbDel('arisan_pertemuan', id);
+    // Remove from all peserta riwayat_bayar
+    for (const p of window.CA.arisan||[]) {
+      const rw = (p.riwayat_bayar||[]).filter(b=>b.pertemuan_ke!==ke);
+      if (rw.length !== (p.riwayat_bayar||[]).length) {
+        await fbUp('arisan', p.id, { riwayat_bayar: rw });
       }
     }
-  };
-  requestAnimationFrame(frame);
-}
-
-window.doSpin = async function() {
-  if (_spinning) return;
-  const canvas = document.getElementById('arisan-canvas');
-  const belum = (window.CA.arisan||[]).filter(a => !a.menang);
-  if (!canvas || !belum.length) return;
-
-  const winner = belum[Math.floor(Math.random() * belum.length)];
-  _spinWinner = null;
-
-  const actEl = document.getElementById('arisan-actions');
-  const dispEl = document.getElementById('ar-display');
-  const btn = document.getElementById('spin-btn');
-  if (actEl) actEl.style.display = 'none';
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Berputar...'; }
-  if (dispEl) dispEl.innerHTML = '<div class="ar-disp-icon" style="animation:spinIco .5s linear infinite">🎡</div><div class="ar-disp-title">Berputar...</div><div class="ar-disp-sub">Menentukan pemenang...</div>';
-  document.querySelectorAll('.arisan-peserta-chip').forEach(c => c.classList.remove('winner'));
-
-  // Broadcast spin to Firebase so viewers can sync
-  try {
-    await fbSet('meta', 'spin_state', { status:'spinning', winner_id:winner.id, ts:Date.now() });
-  } catch(e) { /* ignore */ }
-
-  _animateSpin(canvas, belum, winner, true);
-
-  // After spin done, update Firebase
-  setTimeout(async () => {
-    try {
-      await fbSet('meta', 'spin_state', { status:'done', winner_id:winner.id, ts:Date.now() });
-    } catch(e) { /* ignore */ }
-  }, 4600);
-};
-
-window.ambilArisan = async function() {
-  if (!_spinWinner) return;
-  if (!confirm(`${_spinWinner.nama} mengambil arisan ${fm(_spinWinner.nominal||0)}?`)) return;
-  try {
-    await fbUp('arisan', _spinWinner.id, { menang:true, tgl_menang:new Date().toISOString().split('T')[0] });
-    await fbSet('meta', 'spin_state', { status:'idle', winner_id:null, ts:Date.now() });
-    toast(_spinWinner.nama+' berhasil dicatat!','ok');
-    _spinWinner = null;
+    window._arisanPertemuan = window._arisanPertemuan.filter(p=>p.ke!==ke);
+    btn.closest('div').remove();
+    toast(`Pertemuan ke-${ke} dihapus`,'ok');
   } catch(e) { toast('Gagal','er'); }
 };
 
-window.kasihLain = async function() {
-  if (!_spinWinner) return;
-  toast(_spinWinner.nama+' melewati giliran. Spin ulang!','inf');
-  _spinWinner = null;
-  const actEl = document.getElementById('arisan-actions');
-  if (actEl) actEl.style.display = 'none';
-  document.querySelectorAll('.arisan-peserta-chip').forEach(c => c.classList.remove('winner'));
-  try { await fbSet('meta','spin_state',{status:'idle',winner_id:null,ts:Date.now()}); } catch(e){}
-  setTimeout(() => window.doSpin(), 500);
+window.toggleBayarPt = async function(pid, pertemuan_ke, checked) {
+  const p = (window.CA.arisan||[]).find(x=>x.id===pid);
+  if (!p) return;
+  let riwayat = [...(p.riwayat_bayar||[])];
+  if (checked) {
+    if (riwayat.some(b=>b.pertemuan_ke===pertemuan_ke)) return;
+    const pt = (window._arisanPertemuan||[]).find(x=>x.ke===pertemuan_ke);
+    riwayat.push({ pertemuan_ke, tgl:pt?.tgl||new Date().toISOString().split('T')[0], nominal:p.nominal||0, dicatat:new Date().toISOString() });
+    toast(`${p.nama} ✅ bayar pertemuan ke-${pertemuan_ke}`,'ok');
+  } else {
+    riwayat = riwayat.filter(b=>b.pertemuan_ke!==pertemuan_ke);
+    toast(`${p.nama} — bayar pertemuan ke-${pertemuan_ke} dibatalkan`,'inf');
+  }
+  try {
+    const { fbUp } = await import('./firebase.js');
+    await fbUp('arisan', pid, { riwayat_bayar: riwayat });
+  } catch(e) { toast('Gagal','er'); }
 };
 
+// ── EXPORT EXCEL ──────────────────────────────────────────────
+window.exportExcelArisan = function() {
+  const ar = window.CA.arisan||[];
+  if (!ar.length) { toast('Belum ada data','inf'); return; }
+  if (typeof XLSX !== 'undefined') { _buildExcel(ar); return; }
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  s.onload = () => _buildExcel(ar);
+  s.onerror = () => toast('Gagal load library Excel','er');
+  document.head.appendChild(s);
+};
+
+function _buildExcel(ar) {
+  const pt = [...(window._arisanPertemuan||[])].sort((a,b)=>a.ke-b.ke);
+  const sorted = [...ar].sort((a,b)=>a.nama.localeCompare(b.nama));
+  const today = new Date().toISOString().split('T')[0];
+
+  // ── SHEET 1: Buku Arisan (mirip foto) ──
+  const header1 = ['No','Nama Peserta','Nominal (Rp)', ...pt.map(p=>`Ke-${p.ke}\n${p.tgl||''}`), 'Total Bayar','Status','Tgl Menang'];
+  const sheet1 = [
+    ['BUKU ARISAN - KADANG KANOMAN MANDIRA'],
+    [`Dicetak: ${new Date().toLocaleString('id-ID')}`],
+    [],
+    header1
+  ];
+  sorted.forEach((p,i) => {
+    const bayarSet = new Set((p.riwayat_bayar||[]).map(b=>b.pertemuan_ke));
+    sheet1.push([
+      i+1, p.nama, p.nominal||0,
+      ...pt.map(x => bayarSet.has(x.ke) ? '✓' : ''),
+      `${bayarSet.size}/${pt.length}`,
+      p.menang ? 'Menang' : 'Belum',
+      p.tgl_menang||'-'
+    ]);
+  });
+  // Total row
+  sheet1.push([]);
+  sheet1.push(['','TOTAL BAYAR PER PERTEMUAN','',
+    ...pt.map(x => {
+      const cnt = ar.filter(p=>(p.riwayat_bayar||[]).some(b=>b.pertemuan_ke===x.ke)).length;
+      return `${cnt} org\n${fm(cnt*(ar[0]?.nominal||0))}`;
+    }),
+    '','',''
+  ]);
+
+  // ── SHEET 2: Riwayat Detail ──
+  const sheet2 = [
+    ['RIWAYAT DETAIL PEMBAYARAN'],
+    [],
+    ['Nama','Pertemuan Ke','Tanggal','Nominal (Rp)','Dicatat']
+  ];
+  sorted.forEach(p => {
+    [...(p.riwayat_bayar||[])].sort((a,b)=>a.pertemuan_ke-b.pertemuan_ke).forEach(b => {
+      sheet2.push([p.nama, b.pertemuan_ke, b.tgl, b.nominal||p.nominal||0, b.dicatat ? new Date(b.dicatat).toLocaleString('id-ID') : '-']);
+    });
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.aoa_to_sheet(sheet1);
+  ws1['!cols'] = [{wch:5},{wch:25},{wch:14},...pt.map(()=>({wch:10})),{wch:12},{wch:10},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Buku Arisan');
+  const ws2 = XLSX.utils.aoa_to_sheet(sheet2);
+  ws2['!cols'] = [{wch:25},{wch:14},{wch:13},{wch:15},{wch:22}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Riwayat Detail');
+
+  XLSX.writeFile(wb, `Arisan_KKM_${today}.xlsx`);
+  toast('File Excel berhasil didownload! 📊','ok');
+}
+
+// ── OTHER ARISAN FUNCTIONS ────────────────────────────────────
 window.manualMenang = async function(id) {
   const p = (window.CA.arisan||[]).find(x=>x.id===id);
   if (!p || !confirm(`Tandai ${p.nama} sebagai pemenang?`)) return;
-  try { await fbUp('arisan',id,{menang:true,tgl_menang:new Date().toISOString().split('T')[0]}); toast('Berhasil','ok'); }
+  try { const { fbUp } = await import('./firebase.js'); await fbUp('arisan',id,{menang:true,tgl_menang:new Date().toISOString().split('T')[0]}); toast('Berhasil','ok'); }
   catch(e) { toast('Gagal','er'); }
 };
 window.unmenang = async function(id) {
   const p = (window.CA.arisan||[]).find(x=>x.id===id);
   if (!p || !confirm(`Batalkan kemenangan ${p.nama}?`)) return;
-  try { await fbUp('arisan',id,{menang:false,tgl_menang:null}); toast('Dibatalkan','ok'); }
+  try { const { fbUp } = await import('./firebase.js'); await fbUp('arisan',id,{menang:false,tgl_menang:null}); toast('Dibatalkan','ok'); }
   catch(e) { toast('Gagal','er'); }
 };
 window.dlPeserta = async function(id) {
   if (!confirm('Hapus peserta ini?')) return;
-  try { await fbDel('arisan',id); toast('Dihapus','ok'); } catch(e) { toast('Gagal','er'); }
+  try { const { fbDel } = await import('./firebase.js'); await fbDel('arisan',id); toast('Dihapus','ok'); }
+  catch(e) { toast('Gagal','er'); }
 };
 window.resetArisan = async function() {
   if (!confirm('Reset semua peserta ke Belum Menang?')) return;
   try {
+    const { fbUp, fbSet } = await import('./firebase.js');
     for (const a of window.CA.arisan||[]) await fbUp('arisan',a.id,{menang:false,tgl_menang:null});
     await fbSet('meta','spin_state',{status:'idle',winner_id:null,ts:Date.now()});
     window._wheelAngle = 0;
     toast('Putaran baru dimulai!','ok');
   } catch(e) { toast('Gagal','er'); }
 };
-
 window.mArisanPeserta = function() {
   const ar = window.CA.arisan || [];
   const nominal = ar[0]?.nominal || 0;
@@ -1361,7 +1222,8 @@ window.addPeserta = async function() {
   const nom = Number(document.getElementById('ar-nom')?.value)||0;
   if (!nama) { toast('Nama wajib diisi','er'); return; }
   try {
-    const id = await fbAdd('arisan',{nama,nominal:nom,menang:false,tgl_menang:null});
+    const { fbAdd, fbUp } = await import('./firebase.js');
+    const id = await fbAdd('arisan',{nama,nominal:nom,menang:false,tgl_menang:null,riwayat_bayar:[]});
     for (const a of window.CA.arisan||[]) if(a.nominal!==nom) await fbUp('arisan',a.id,{nominal:nom});
     const list = document.getElementById('peserta-list');
     if (list) {
@@ -1376,7 +1238,7 @@ window.addPeserta = async function() {
   } catch(e) { toast('Gagal','er'); }
 };
 window.dlPesertaInline = async function(id, btn) {
-  try { await fbDel('arisan',id); btn.closest('div').remove(); toast('Dihapus','ok'); }
+  try { const { fbDel } = await import('./firebase.js'); await fbDel('arisan',id); btn.closest('div').remove(); toast('Dihapus','ok'); }
   catch(e) { toast('Gagal','er'); }
 };
 window.importDariAnggota = async function() {
@@ -1384,9 +1246,10 @@ window.importDariAnggota = async function() {
   const nom = Number(document.getElementById('ar-nom')?.value)||0;
   const toAdd = (window.CA.users||[]).filter(u=>!existing.includes(u.nama.toLowerCase()));
   if (!toAdd.length) { toast('Semua anggota sudah terdaftar','inf'); return; }
-  if (!confirm(`Import ${toAdd.length} anggota sebagai peserta?`)) return;
+  if (!confirm(`Import ${toAdd.length} anggota?`)) return;
   try {
-    for (const u of toAdd) await fbAdd('arisan',{nama:u.nama,nominal:nom,menang:false,tgl_menang:null});
+    const { fbAdd } = await import('./firebase.js');
+    for (const u of toAdd) await fbAdd('arisan',{nama:u.nama,nominal:nom,menang:false,tgl_menang:null,riwayat_bayar:[]});
     toast(`${toAdd.length} anggota diimport!`,'ok');
     document.querySelector('.mo')?.remove();
   } catch(e) { toast('Gagal','er'); }

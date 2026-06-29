@@ -291,3 +291,11 @@ tbody tr:hover td{background:var(--sf2)}
 .pay-toggle-track::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
 .pay-toggle input:checked + .pay-toggle-track{background:var(--ok)}
 .pay-toggle input:checked + .pay-toggle-track::after{transform:translateX(16px)}
+
+/* ── ARISAN BOOK TABLE ── */
+.arisan-book-table{width:100%;border-collapse:collapse;font-size:.8rem}
+.arisan-book-table thead th{padding:.55rem .65rem;background:var(--sf2);border:1px solid var(--bd);font-size:.7rem;font-weight:600;color:var(--tx2);text-align:center;white-space:nowrap}
+.arisan-book-table thead th:first-child{text-align:left}
+.arisan-book-table tbody td{padding:.45rem .65rem;border:1px solid var(--bd);vertical-align:middle}
+.arisan-book-table tbody tr:hover td{background:var(--sf2)}
+.arisan-book-table tfoot td,.arisan-book-table tbody tr:last-child.summary td{background:var(--sf2);font-weight:600;font-size:.72rem;text-align:center;border:1px solid var(--bd2)}

@@ -137,9 +137,13 @@ cols.forEach(col => {
     if (loaded >= cols.length) {
       // All collections loaded at least once
       renderPage(window.currentPage, CU, window.CA);
-  // Init arisan wheel immediately after render if on arisan page
+  // Init arisan page
   if (window.currentPage === 'arisan') {
-    setTimeout(() => window.initArisanWheel && window.initArisanWheel(), 80);
+    // Load pertemuan then init wheel
+    window.loadArisanPertemuan && window.loadArisanPertemuan().then(() => {
+      renderPage(window.currentPage, window.CU, window.CA);
+      setTimeout(() => window.initArisanWheel && window.initArisanWheel(), 80);
+    });
   }
     } else {
       // Re-render on every realtime update after initial load
