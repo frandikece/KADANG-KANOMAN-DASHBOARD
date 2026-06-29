@@ -51,10 +51,30 @@ function rDash(CU, CA) {
   const nx = up[0];
   return `
   <div class="stat-grid">
-    <div class="stat-card"><div class="stat-icon" style="background:#ede9fe">👥</div><div class="stat-val">${CA.users.length}</div><div class="stat-label">Total Anggota</div></div>
-    <div class="stat-card"><div class="stat-icon" style="background:#d1fae5">📅</div><div class="stat-val">${up.length}</div><div class="stat-label">Rapat Mendatang</div></div>
-    <div class="stat-card"><div class="stat-icon" style="background:#dbeafe">✅</div><div class="stat-val">${myAb}</div><div class="stat-label">Absensi Saya</div></div>
-    <div class="stat-card"><div class="stat-icon" style="background:#fef3c7">💰</div><div class="stat-val" style="font-size:.95rem">${fm(saldo)}</div><div class="stat-label">Saldo Kas</div></div>
+    <div class="stat-card stat-clickable" onclick="window.navigate('anggota')" title="Lihat Data Anggota">
+      <div class="stat-icon" style="background:#ede9fe">👥</div>
+      <div class="stat-val">${CA.users.length}</div>
+      <div class="stat-label">Total Anggota</div>
+      <div class="stat-link">Lihat semua →</div>
+    </div>
+    <div class="stat-card stat-clickable" onclick="window.navigate('rapat')" title="Lihat Jadwal Rapat">
+      <div class="stat-icon" style="background:#d1fae5">📅</div>
+      <div class="stat-val">${up.length}</div>
+      <div class="stat-label">Rapat Mendatang</div>
+      <div class="stat-link">Lihat jadwal →</div>
+    </div>
+    <div class="stat-card stat-clickable" onclick="window.navigate('absensi_rekap')" title="Lihat Rekap Absensi">
+      <div class="stat-icon" style="background:#dbeafe">✅</div>
+      <div class="stat-val">${myAb}</div>
+      <div class="stat-label">Absensi Saya</div>
+      <div class="stat-link">Lihat rekap →</div>
+    </div>
+    <div class="stat-card stat-clickable" onclick="window.navigate('kas')" title="Lihat Kas Organisasi">
+      <div class="stat-icon" style="background:#fef3c7">💰</div>
+      <div class="stat-val" style="font-size:.95rem">${fm(saldo)}</div>
+      <div class="stat-label">Saldo Kas</div>
+      <div class="stat-link">Lihat kas →</div>
+    </div>
   </div>
   ${nx ? `<div class="card mb-1">
     <div class="card-header"><h3 class="card-title">📅 Rapat Berikutnya</h3><span class="badge b-pr">Akan Datang</span></div>
@@ -946,48 +966,73 @@ export function rArisan(CU, CA) {
     ${!ar.length
       ? '<div class="empty-state"><span class="ic">📒</span><h3>Belum ada peserta</h3><p>Tambahkan peserta terlebih dahulu.</p></div>'
       : (() => {
-          // Get pertemuan list sorted
           const pertemuan = [...(window._arisanPertemuan||[])].sort((a,b)=>a.ke-b.ke);
-          return '<div style="overflow-x:auto"><table class="arisan-book-table">'+
+          const totalPt = pertemuan.length;
+          // Smart view: if > 12 pertemuan, show paginated (8 per page)
+          const PAGE_SIZE = 10;
+          const currentPtPage = window._arisanPtPage || 0;
+          const totalPtPages = Math.ceil(totalPt / PAGE_SIZE);
+          const ptSlice = totalPt > PAGE_SIZE
+            ? pertemuan.slice(currentPtPage * PAGE_SIZE, (currentPtPage+1) * PAGE_SIZE)
+            : pertemuan;
+          const showPagination = totalPt > PAGE_SIZE;
+
+          let html = '';
+          // Pagination controls (top)
+          if (showPagination) {
+            html += `<div class="flex items-center justify-between" style="padding:.6rem .85rem;background:var(--sf2);border-bottom:1px solid var(--bd);font-size:.78rem">
+              <div style="color:var(--tx2)">Menampilkan pertemuan ke-<strong>${currentPtPage*PAGE_SIZE+1}</strong> s/d <strong>${Math.min((currentPtPage+1)*PAGE_SIZE,totalPt)}</strong> dari <strong>${totalPt}</strong> pertemuan</div>
+              <div class="flex" style="gap:.3rem">
+                <button class="btn btn-o btn-xs" ${currentPtPage===0?'disabled':''} onclick="window._arisanPtPage=(window._arisanPtPage||0)-1;renderPage(window.currentPage,window.CU,window.CA)">← Prev</button>
+                <span style="padding:.2rem .5rem;font-size:.72rem;color:var(--tx2)">${currentPtPage+1}/${totalPtPages}</span>
+                <button class="btn btn-o btn-xs" ${currentPtPage>=totalPtPages-1?'disabled':''} onclick="window._arisanPtPage=(window._arisanPtPage||0)+1;renderPage(window.currentPage,window.CU,window.CA)">Next →</button>
+                <button class="btn btn-p btn-xs" onclick="window._arisanPtPage=0;window._showAllPt=!window._showAllPt;renderPage(window.currentPage,window.CU,window.CA)">${window._showAllPt?'Halaman':'Semua'}</button>
+              </div>
+            </div>`;
+          }
+
+          const ptToShow = (window._showAllPt || !showPagination) ? pertemuan : ptSlice;
+
+          html += '<div style="overflow-x:auto"><table class="arisan-book-table">'+
           '<thead><tr>'+
-            '<th style="min-width:140px;position:sticky;left:0;background:var(--sf2);z-index:2">Nama Peserta</th>'+
-            '<th style="min-width:90px">Nominal</th>'+
-            pertemuan.map(pt =>
-              `<th style="min-width:80px;text-align:center">
-                <div style="font-size:.65rem;font-weight:700">Ke-${pt.ke}</div>
-                <div style="font-size:.6rem;color:var(--tx2);font-weight:400">${pt.tgl||''}</div>
+            '<th class="sticky-col">Nama Peserta</th>'+
+            '<th style="min-width:85px;text-align:center">Nominal</th>'+
+            ptToShow.map(pt =>
+              `<th style="min-width:62px;text-align:center;padding:.45rem .3rem">
+                <div style="font-size:.68rem;font-weight:700;color:var(--pr)">Ke-${pt.ke}</div>
+                <div style="font-size:.58rem;color:var(--tx2);font-weight:400;white-space:nowrap">${pt.tgl?pt.tgl.slice(5):''}</div>
               </th>`
             ).join('')+
-            '<th style="min-width:80px;text-align:center">Total Bayar</th>'+
-            '<th style="min-width:90px;text-align:center">Status</th>'+
-            (canEdit ? '<th style="min-width:60px">Aksi</th>' : '')+
+            '<th style="min-width:72px;text-align:center">Bayar</th>'+
+            '<th style="min-width:75px;text-align:center">Status</th>'+
+            (canEdit ? '<th style="min-width:55px">Aksi</th>' : '')+
           '</tr></thead>'+
           '<tbody>'+
           [...ar].sort((a,b)=>a.nama.localeCompare(b.nama)).map(p => {
             const bayarSet = new Set((p.riwayat_bayar||[]).map(b=>b.pertemuan_ke));
             const totalBayar = bayarSet.size;
             return '<tr>'+
-              `<td style="font-weight:500;position:sticky;left:0;background:var(--sf);z-index:1;white-space:nowrap">
+              `<td class="sticky-col" style="font-weight:500;white-space:nowrap">
                 ${p.menang ? '🏆' : '⏳'} ${esc(p.nama)}
               </td>`+
-              `<td style="font-size:.75rem;text-align:center">${fm(p.nominal||0)}</td>`+
-              pertemuan.map(pt => {
+              `<td style="font-size:.72rem;text-align:center;color:var(--tx2)">${fm(p.nominal||0)}</td>`+
+              ptToShow.map(pt => {
                 const sudahBayar = bayarSet.has(pt.ke);
-                return `<td style="text-align:center;padding:.4rem">` +
+                return `<td style="text-align:center;padding:.3rem .2rem">` +
                   (canEdit
-                    ? `<label class="pay-toggle" title="${sudahBayar?'Sudah bayar — klik batal':'Belum bayar — klik tandai'}">
+                    ? `<label class="pay-toggle-mini" title="${sudahBayar?'Sudah bayar ke-'+pt.ke+' — klik batal':'Belum bayar ke-'+pt.ke+' — klik tandai'}">
                         <input type="checkbox" ${sudahBayar?'checked':''} onchange="window.toggleBayarPt('${p.id}',${pt.ke},this.checked)">
-                        <span class="pay-toggle-track"></span>
+                        <span class="ptm-track"></span>
                        </label>`
-                    : sudahBayar
-                      ? '<span style="font-size:1.1rem">✅</span>'
-                      : '<span style="font-size:1rem;opacity:.25">○</span>'
+                    : (sudahBayar
+                      ? '<span style="font-size:1rem;line-height:1">✅</span>'
+                      : '<span style="font-size:.9rem;opacity:.2;line-height:1">○</span>')
                   ) + '</td>';
               }).join('')+
-              `<td style="text-align:center;font-weight:600;color:var(--ok)">${totalBayar}/${pertemuan.length}</td>`+
+              `<td style="text-align:center;font-weight:700;font-size:.8rem;color:${totalBayar===pertemuan.length?'var(--ok)':totalBayar>0?'var(--wn)':'var(--er)'}">${totalBayar}/${pertemuan.length}</td>`+
               `<td style="text-align:center">${p.menang
-                ? '<span class="badge b-ok" style="font-size:.62rem">Menang</span>'
-                : '<span class="badge b-pr" style="font-size:.62rem">Belum</span>'}
+                ? '<span class="badge b-ok" style="font-size:.6rem">Menang</span>'
+                : '<span class="badge b-pr" style="font-size:.6rem">Belum</span>'}
               </td>`+
               (canEdit ? `<td><div class="flex" style="gap:.2rem">
                 ${p.menang
@@ -998,20 +1043,20 @@ export function rArisan(CU, CA) {
             '</tr>';
           }).join('')+
           // Summary row
-          '<tr style="background:var(--sf2);font-weight:600">'+
-            '<td style="position:sticky;left:0;background:var(--sf2)">TOTAL BAYAR</td>'+
+          '<tr style="background:var(--sf2);font-weight:600;font-size:.75rem">'+
+            '<td class="sticky-col" style="background:var(--sf2);font-size:.72rem;color:var(--tx2)">TOTAL</td>'+
             '<td></td>'+
-            pertemuan.map(pt => {
+            ptToShow.map(pt => {
               const cnt = ar.filter(p=>(p.riwayat_bayar||[]).some(b=>b.pertemuan_ke===pt.ke)).length;
               const total = cnt * (ar[0]?.nominal||0);
-              return `<td style="text-align:center;font-size:.72rem">
-                <div>${cnt}/${ar.length} org</div>
-                <div style="color:var(--ok)">${fm(total)}</div>
+              return `<td style="text-align:center;font-size:.68rem;padding:.3rem .2rem">
+                <div style="font-weight:700;color:var(--pr)">${cnt}<span style="font-weight:400;color:var(--tx3)">/${ar.length}</span></div>
+                <div style="color:var(--ok);font-size:.6rem">${fm(total)}</div>
               </td>`;
             }).join('')+
-            `<td style="text-align:center;color:var(--ok)">${
+            `<td style="text-align:center;color:var(--ok);font-size:.78rem">${
               ar.reduce((s,p)=>s+new Set((p.riwayat_bayar||[]).map(b=>b.pertemuan_ke)).size,0)
-            }x total</td>`+
+            }x</td>`+
             '<td></td>'+
             (canEdit ? '<td></td>' : '')+
           '</tr>'+

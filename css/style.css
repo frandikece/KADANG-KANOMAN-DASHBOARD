@@ -299,3 +299,22 @@ tbody tr:hover td{background:var(--sf2)}
 .arisan-book-table tbody td{padding:.45rem .65rem;border:1px solid var(--bd);vertical-align:middle}
 .arisan-book-table tbody tr:hover td{background:var(--sf2)}
 .arisan-book-table tfoot td,.arisan-book-table tbody tr:last-child.summary td{background:var(--sf2);font-weight:600;font-size:.72rem;text-align:center;border:1px solid var(--bd2)}
+
+/* ── CLICKABLE STAT CARDS ── */
+.stat-clickable{cursor:pointer;transition:all .18s;position:relative;overflow:hidden}
+.stat-clickable:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.12);border-color:var(--pr)}
+.stat-clickable:active{transform:translateY(-1px)}
+.stat-link{font-size:.68rem;color:var(--pr);font-weight:600;margin-top:.4rem;opacity:0;transition:opacity .15s}
+.stat-clickable:hover .stat-link{opacity:1}
+
+/* ── MINI PAY TOGGLE (for buku arisan) ── */
+.pay-toggle-mini{position:relative;display:inline-flex;align-items:center;cursor:pointer}
+.pay-toggle-mini input{opacity:0;width:0;height:0;position:absolute}
+.ptm-track{width:28px;height:16px;background:var(--bd2);border-radius:20px;transition:background .2s;position:relative;flex-shrink:0;display:block}
+.ptm-track::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.pay-toggle-mini input:checked + .ptm-track{background:var(--ok)}
+.pay-toggle-mini input:checked + .ptm-track::after{transform:translateX(12px)}
+
+/* ── STICKY COL for buku arisan ── */
+.arisan-book-table .sticky-col{position:sticky;left:0;background:var(--sf);z-index:2;white-space:nowrap;box-shadow:2px 0 4px rgba(0,0,0,.06)}
+.arisan-book-table thead .sticky-col{background:var(--sf2);z-index:3}
