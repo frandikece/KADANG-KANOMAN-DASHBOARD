@@ -24,6 +24,7 @@ export const fbSet  = (col, id, data)   => setDoc(doc(db, col, id), data, { merg
 export const fbUp   = (col, id, data)   => updateDoc(doc(db, col, id), data);
 export const fbDel  = (col, id)         => deleteDoc(doc(db, col, id));
 export const fbSub  = (col, cb)         => onSnapshot(collection(db, col), snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+export const fbSubDoc = (col, id, cb)   => onSnapshot(doc(db, col, id), snap => cb(snap.exists() ? snap.data() : null));
 
 // ── SHARED UTILS ───────────────────────────────────────────────
 export const uid    = () => Math.random().toString(36).substr(2, 9);

@@ -852,17 +852,6 @@ function drawWheel(canvas, items, angle, highlightIdx = -1) {
   ctx.textBaseline = 'alphabetic';
 }
 
-// Init wheel - called after arisan page renders
-window.initArisanWheel = function() {
-  const canvas = document.getElementById('arisan-canvas');
-  if (!canvas) return;
-  const belum = (window.CA.arisan||[]).filter(a => !a.menang);
-  if (!belum.length) return;
-  window._wheelItems = belum;
-  if (!window._wheelAngle) window._wheelAngle = 0;
-  drawWheel(canvas, belum, window._wheelAngle);
-};
-
 // Init wheel — called after arisan page renders
 window.initArisanWheel = function() {
   const canvas = document.getElementById('arisan-canvas');
@@ -871,6 +860,129 @@ window.initArisanWheel = function() {
   if (!belum.length) return;
   if (!window._wheelAngle) window._wheelAngle = 0;
   drawWheel(canvas, belum, window._wheelAngle);
+};
+
+// ── SPIN FUNCTIONS ────────────────────────────────────────────
+let _spinning = false;
+let _spinWinner = null;
+
+function _animateSpin(canvas, belum, winner, isAdmin) {
+  _spinning = true;
+  const n = belum.length;
+  const slice = (2 * Math.PI) / n;
+  const winnerIdx = belum.indexOf(winner);
+  const targetSliceCenter = winnerIdx * slice + slice / 2;
+  const targetAngle = -Math.PI/2 - targetSliceCenter;
+  const extraSpins = (6 + Math.floor(Math.random()*3)) * 2 * Math.PI;
+  const finalAngle = targetAngle + extraSpins;
+  const duration = 4500;
+  const startT = performance.now();
+  const startAngle = window._wheelAngle || 0;
+  const easeOut = t => 1 - Math.pow(1 - t, 4);
+
+  const frame = now => {
+    const p = Math.min((now - startT) / duration, 1);
+    const cur = startAngle + (finalAngle - startAngle) * easeOut(p);
+    window._wheelAngle = cur;
+    drawWheel(canvas, belum, cur);
+    if (p < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      _spinning = false;
+      _spinWinner = winner;
+      // Highlight winner
+      const winIdx = belum.indexOf(winner);
+      drawWheel(canvas, belum, cur, winIdx);
+      // Update display
+      const dispEl = document.getElementById('ar-display');
+      if (dispEl) dispEl.innerHTML = '<div class="ar-disp-icon">🎉</div><div class="ar-disp-title">'+esc(winner.nama)+'</div><div class="ar-disp-sub">Pemenang Arisan!</div>';
+      const actEl = document.getElementById('arisan-actions');
+      if (actEl) actEl.style.display = 'block';
+      // Highlight chip
+      document.querySelectorAll('.arisan-peserta-chip').forEach(c=>c.classList.remove('winner'));
+      const chip = document.getElementById('chip-'+winner.id);
+      if (chip) { chip.classList.add('winner'); chip.scrollIntoView({behavior:'smooth',block:'nearest'}); }
+      if (isAdmin) {
+        const btn = document.getElementById('spin-btn');
+        if (btn) { btn.disabled = false; btn.textContent = '🎡 PUTAR LAGI'; }
+      }
+    }
+  };
+  requestAnimationFrame(frame);
+}
+
+window.doSpin = async function() {
+  if (_spinning) return;
+  const canvas = document.getElementById('arisan-canvas');
+  const belum = (window.CA.arisan||[]).filter(a => !a.menang);
+  if (!canvas || !belum.length) { toast('Belum ada peserta atau semua sudah menang','inf'); return; }
+
+  const winner = belum[Math.floor(Math.random() * belum.length)];
+  _spinWinner = null;
+
+  const actEl = document.getElementById('arisan-actions');
+  const dispEl = document.getElementById('ar-display');
+  const btn = document.getElementById('spin-btn');
+  if (actEl) actEl.style.display = 'none';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Berputar...'; }
+  if (dispEl) dispEl.innerHTML = '<div class="ar-disp-icon" style="animation:spinIco .5s linear infinite">🎡</div><div class="ar-disp-title">Berputar...</div><div class="ar-disp-sub">Menentukan pemenang...</div>';
+  document.querySelectorAll('.arisan-peserta-chip').forEach(c=>c.classList.remove('winner'));
+
+  try { await fbSet('meta','spin_state',{status:'spinning',winner_id:winner.id,ts:Date.now()}); } catch(e){}
+  _animateSpin(canvas, belum, winner, true);
+  setTimeout(async()=>{ try{await fbSet('meta','spin_state',{status:'done',winner_id:winner.id,ts:Date.now()});}catch(e){} }, 4600);
+};
+
+window.ambilArisan = async function() {
+  if (!_spinWinner) return;
+  if (!confirm(_spinWinner.nama+' mengambil arisan '+fm(_spinWinner.nominal||0)+'?')) return;
+  try {
+    await fbUp('arisan',_spinWinner.id,{menang:true,tgl_menang:new Date().toISOString().split('T')[0]});
+    await fbSet('meta','spin_state',{status:'idle',winner_id:null,ts:Date.now()});
+    toast(_spinWinner.nama+' berhasil dicatat!','ok');
+    _spinWinner = null;
+  } catch(e) { toast('Gagal','er'); }
+};
+
+window.kasihLain = async function() {
+  if (!_spinWinner) return;
+  toast(_spinWinner.nama+' melewati giliran. Spin ulang!','inf');
+  _spinWinner = null;
+  const actEl = document.getElementById('arisan-actions');
+  if (actEl) actEl.style.display = 'none';
+  document.querySelectorAll('.arisan-peserta-chip').forEach(c=>c.classList.remove('winner'));
+  try { await fbSet('meta','spin_state',{status:'idle',winner_id:null,ts:Date.now()}); } catch(e){}
+  setTimeout(()=>window.doSpin(), 500);
+};
+
+// Viewer handler — called from dashboard.html spin_state subscription
+// Lets non-admin/bendahara users see the wheel spin in real-time
+window._handleSpinStateViewer = function(state) {
+  if (!state) return;
+  const canvas = document.getElementById('arisan-canvas');
+  const belum = (window.CA.arisan||[]).filter(a => !a.menang);
+  if (!canvas || !belum.length) return;
+
+  if (state.status === 'spinning' && !_spinning) {
+    const winner = belum.find(p => p.id === state.winner_id);
+    if (winner) _animateSpin(canvas, belum, winner, false);
+  } else if (state.status === 'done' && !_spinning) {
+    const winner = belum.find(p => p.id === state.winner_id);
+    if (winner) {
+      const dispEl = document.getElementById('ar-display');
+      if (dispEl) dispEl.innerHTML = '<div class="ar-disp-icon">🎉</div><div class="ar-disp-title">'+esc(winner.nama)+'</div><div class="ar-disp-sub">Pemenang Arisan!</div>';
+      document.querySelectorAll('.arisan-peserta-chip').forEach(c=>c.classList.remove('winner'));
+      const chip = document.getElementById('chip-'+winner.id);
+      if (chip) chip.classList.add('winner');
+      const idx = belum.indexOf(winner);
+      drawWheel(canvas, belum, window._wheelAngle||0, idx);
+    }
+  } else if (state.status === 'idle') {
+    const dispEl = document.getElementById('ar-display');
+    if (dispEl) dispEl.innerHTML = '<div class="ar-disp-icon">🎡</div><div class="ar-disp-title">Siap Berputar</div><div class="ar-disp-sub">Menunggu Admin/Bendahara memutar...</div>';
+    document.querySelectorAll('.arisan-peserta-chip').forEach(c=>c.classList.remove('winner'));
+    drawWheel(canvas, belum, window._wheelAngle||0);
+  }
 };
 
 export function rArisan(CU, CA) {
@@ -963,107 +1075,106 @@ export function rArisan(CU, CA) {
       </div>
     </div>
 
-    ${!ar.length
-      ? '<div class="empty-state"><span class="ic">📒</span><h3>Belum ada peserta</h3><p>Tambahkan peserta terlebih dahulu.</p></div>'
-      : (() => {
-          const pertemuan = [...(window._arisanPertemuan||[])].sort((a,b)=>a.ke-b.ke);
-          const totalPt = pertemuan.length;
-          // Smart view: if > 12 pertemuan, show paginated (8 per page)
-          const PAGE_SIZE = 10;
-          const currentPtPage = window._arisanPtPage || 0;
-          const totalPtPages = Math.ceil(totalPt / PAGE_SIZE);
-          const ptSlice = totalPt > PAGE_SIZE
-            ? pertemuan.slice(currentPtPage * PAGE_SIZE, (currentPtPage+1) * PAGE_SIZE)
-            : pertemuan;
-          const showPagination = totalPt > PAGE_SIZE;
-
-          let html = '';
-          // Pagination controls (top)
-          if (showPagination) {
-            html += `<div class="flex items-center justify-between" style="padding:.6rem .85rem;background:var(--sf2);border-bottom:1px solid var(--bd);font-size:.78rem">
-              <div style="color:var(--tx2)">Menampilkan pertemuan ke-<strong>${currentPtPage*PAGE_SIZE+1}</strong> s/d <strong>${Math.min((currentPtPage+1)*PAGE_SIZE,totalPt)}</strong> dari <strong>${totalPt}</strong> pertemuan</div>
-              <div class="flex" style="gap:.3rem">
-                <button class="btn btn-o btn-xs" ${currentPtPage===0?'disabled':''} onclick="window._arisanPtPage=(window._arisanPtPage||0)-1;renderPage(window.currentPage,window.CU,window.CA)">← Prev</button>
-                <span style="padding:.2rem .5rem;font-size:.72rem;color:var(--tx2)">${currentPtPage+1}/${totalPtPages}</span>
-                <button class="btn btn-o btn-xs" ${currentPtPage>=totalPtPages-1?'disabled':''} onclick="window._arisanPtPage=(window._arisanPtPage||0)+1;renderPage(window.currentPage,window.CU,window.CA)">Next →</button>
-                <button class="btn btn-p btn-xs" onclick="window._arisanPtPage=0;window._showAllPt=!window._showAllPt;renderPage(window.currentPage,window.CU,window.CA)">${window._showAllPt?'Halaman':'Semua'}</button>
-              </div>
-            </div>`;
-          }
-
-          const ptToShow = (window._showAllPt || !showPagination) ? pertemuan : ptSlice;
-
-          html += '<div style="overflow-x:auto"><table class="arisan-book-table">'+
-          '<thead><tr>'+
-            '<th class="sticky-col">Nama Peserta</th>'+
-            '<th style="min-width:85px;text-align:center">Nominal</th>'+
-            ptToShow.map(pt =>
-              `<th style="min-width:62px;text-align:center;padding:.45rem .3rem">
-                <div style="font-size:.68rem;font-weight:700;color:var(--pr)">Ke-${pt.ke}</div>
-                <div style="font-size:.58rem;color:var(--tx2);font-weight:400;white-space:nowrap">${pt.tgl?pt.tgl.slice(5):''}</div>
-              </th>`
-            ).join('')+
-            '<th style="min-width:72px;text-align:center">Bayar</th>'+
-            '<th style="min-width:75px;text-align:center">Status</th>'+
-            (canEdit ? '<th style="min-width:55px">Aksi</th>' : '')+
-          '</tr></thead>'+
-          '<tbody>'+
-          [...ar].sort((a,b)=>a.nama.localeCompare(b.nama)).map(p => {
-            const bayarSet = new Set((p.riwayat_bayar||[]).map(b=>b.pertemuan_ke));
-            const totalBayar = bayarSet.size;
-            return '<tr>'+
-              `<td class="sticky-col" style="font-weight:500;white-space:nowrap">
-                ${p.menang ? '🏆' : '⏳'} ${esc(p.nama)}
-              </td>`+
-              `<td style="font-size:.72rem;text-align:center;color:var(--tx2)">${fm(p.nominal||0)}</td>`+
-              ptToShow.map(pt => {
-                const sudahBayar = bayarSet.has(pt.ke);
-                return `<td style="text-align:center;padding:.3rem .2rem">` +
-                  (canEdit
-                    ? `<label class="pay-toggle-mini" title="${sudahBayar?'Sudah bayar ke-'+pt.ke+' — klik batal':'Belum bayar ke-'+pt.ke+' — klik tandai'}">
-                        <input type="checkbox" ${sudahBayar?'checked':''} onchange="window.toggleBayarPt('${p.id}',${pt.ke},this.checked)">
-                        <span class="ptm-track"></span>
-                       </label>`
-                    : (sudahBayar
-                      ? '<span style="font-size:1rem;line-height:1">✅</span>'
-                      : '<span style="font-size:.9rem;opacity:.2;line-height:1">○</span>')
-                  ) + '</td>';
-              }).join('')+
-              `<td style="text-align:center;font-weight:700;font-size:.8rem;color:${totalBayar===pertemuan.length?'var(--ok)':totalBayar>0?'var(--wn)':'var(--er)'}">${totalBayar}/${pertemuan.length}</td>`+
-              `<td style="text-align:center">${p.menang
-                ? '<span class="badge b-ok" style="font-size:.6rem">Menang</span>'
-                : '<span class="badge b-pr" style="font-size:.6rem">Belum</span>'}
-              </td>`+
-              (canEdit ? `<td><div class="flex" style="gap:.2rem">
-                ${p.menang
-                  ? `<button class="btn btn-o btn-xs" onclick="window.unmenang('${p.id}')">↩️</button>`
-                  : `<button class="btn btn-ok btn-xs" onclick="window.manualMenang('${p.id}')">✅</button>`}
-                <button class="btn btn-er btn-xs" onclick="window.dlPeserta('${p.id}')">🗑️</button>
-              </div></td>` : '')+
-            '</tr>';
-          }).join('')+
-          // Summary row
-          '<tr style="background:var(--sf2);font-weight:600;font-size:.75rem">'+
-            '<td class="sticky-col" style="background:var(--sf2);font-size:.72rem;color:var(--tx2)">TOTAL</td>'+
-            '<td></td>'+
-            ptToShow.map(pt => {
-              const cnt = ar.filter(p=>(p.riwayat_bayar||[]).some(b=>b.pertemuan_ke===pt.ke)).length;
-              const total = cnt * (ar[0]?.nominal||0);
-              return `<td style="text-align:center;font-size:.68rem;padding:.3rem .2rem">
-                <div style="font-weight:700;color:var(--pr)">${cnt}<span style="font-weight:400;color:var(--tx3)">/${ar.length}</span></div>
-                <div style="color:var(--ok);font-size:.6rem">${fm(total)}</div>
-              </td>`;
-            }).join('')+
-            `<td style="text-align:center;color:var(--ok);font-size:.78rem">${
-              ar.reduce((s,p)=>s+new Set((p.riwayat_bayar||[]).map(b=>b.pertemuan_ke)).size,0)
-            }x</td>`+
-            '<td></td>'+
-            (canEdit ? '<td></td>' : '')+
-          '</tr>'+
-          '</tbody></table></div>';
-        })()
-    }
+    ${buildBukuArisanHTML(ar, canEdit)}
   </div>`;
+}
+
+function buildBukuArisanHTML(ar, canEdit) {
+  if (!ar.length) return '<div class="empty-state"><span class="ic">📒</span><h3>Belum ada peserta</h3><p>Tambahkan peserta terlebih dahulu.</p></div>';
+
+  const pertemuan = [...(window._arisanPertemuan||[])].sort((a,b)=>(a.ke||0)-(b.ke||0));
+  const totalPt = pertemuan.length;
+  const PAGE_SIZE = 10;
+  const currentPtPage = window._arisanPtPage || 0;
+  const totalPtPages = Math.ceil(totalPt / PAGE_SIZE);
+  const ptSlice = totalPt > PAGE_SIZE
+    ? pertemuan.slice(currentPtPage * PAGE_SIZE, (currentPtPage+1) * PAGE_SIZE)
+    : pertemuan;
+  const showPagination = totalPt > PAGE_SIZE;
+  const ptToShow = ((window._showAllPt || !showPagination) ? pertemuan : ptSlice) || [];
+
+  let html = '';
+
+  // Pagination controls
+  if (showPagination) {
+    const from = currentPtPage * PAGE_SIZE + 1;
+    const to = Math.min((currentPtPage+1)*PAGE_SIZE, totalPt);
+    html += '<div class="flex items-center justify-between" style="padding:.6rem .85rem;background:var(--sf2);border-bottom:1px solid var(--bd);font-size:.78rem;flex-wrap:wrap;gap:.3rem">' +
+      '<div style="color:var(--tx2)">Pertemuan ke-<strong>'+from+'</strong> s/d <strong>'+to+'</strong> dari <strong>'+totalPt+'</strong></div>' +
+      '<div class="flex" style="gap:.3rem">' +
+        '<button class="btn btn-o btn-xs" '+(currentPtPage===0?'disabled':'')+' onclick="window._arisanPtPage=Math.max(0,(window._arisanPtPage||0)-1);renderPage(window.currentPage,window.CU,window.CA)">← Prev</button>' +
+        '<span style="padding:.2rem .5rem;font-size:.72rem;color:var(--tx2)">'+(currentPtPage+1)+'/'+totalPtPages+'</span>' +
+        '<button class="btn btn-o btn-xs" '+(currentPtPage>=totalPtPages-1?'disabled':'')+' onclick="window._arisanPtPage=(window._arisanPtPage||0)+1;renderPage(window.currentPage,window.CU,window.CA)">Next →</button>' +
+        '<button class="btn btn-p btn-xs" onclick="window._showAllPt=!window._showAllPt;renderPage(window.currentPage,window.CU,window.CA)">'+(window._showAllPt?'Halaman':'Semua')+'</button>' +
+      '</div></div>';
+  }
+
+  html += '<div style="overflow-x:auto"><table class="arisan-book-table">';
+  // Header
+  html += '<thead><tr>' +
+    '<th class="sticky-col">Nama Peserta</th>' +
+    '<th style="min-width:85px;text-align:center">Nominal</th>' +
+    ptToShow.map(pt =>
+      '<th style="min-width:62px;text-align:center;padding:.45rem .3rem">' +
+        '<div style="font-size:.68rem;font-weight:700;color:var(--pr)">Ke-'+(pt.ke||'?')+'</div>' +
+        '<div style="font-size:.58rem;color:var(--tx2);font-weight:400;white-space:nowrap">'+(pt&&pt.tgl?pt.tgl.slice(5):'')+'</div>' +
+      '</th>'
+    ).join('') +
+    '<th style="min-width:72px;text-align:center">Bayar</th>' +
+    '<th style="min-width:75px;text-align:center">Status</th>' +
+    (canEdit ? '<th style="min-width:55px">Aksi</th>' : '') +
+  '</tr></thead>';
+
+  // Body
+  html += '<tbody>';
+  [...ar].sort((a,b)=>a.nama.localeCompare(b.nama)).forEach(p => {
+    const bayarSet = new Set((p.riwayat_bayar||[]).map(b=>b.pertemuan_ke));
+    const totalBayar = bayarSet.size;
+    const warna = totalBayar === pertemuan.length ? 'var(--ok)' : totalBayar > 0 ? 'var(--wn)' : 'var(--er)';
+    html += '<tr>' +
+      '<td class="sticky-col" style="font-weight:500;white-space:nowrap">'+(p.menang?'🏆':'⏳')+' '+esc(p.nama)+'</td>' +
+      '<td style="font-size:.72rem;text-align:center;color:var(--tx2)">'+fm(Number(p.nominal)||0)+'</td>' +
+      ptToShow.map(pt => {
+        const sudahBayar = bayarSet.has(pt.ke);
+        return '<td style="text-align:center;padding:.3rem .2rem">' +
+          (canEdit
+            ? '<label class="pay-toggle-mini" title="'+(sudahBayar?'Sudah bayar ke-'+pt.ke+' — klik batal':'Belum bayar ke-'+pt.ke+' — klik tandai')+'">' +
+              '<input type="checkbox" '+(sudahBayar?'checked':'')+' onchange="window.toggleBayarPt(''+p.id+'','+pt.ke+',this.checked)">' +
+              '<span class="ptm-track"></span>' +
+              '</label>'
+            : (sudahBayar ? '<span style="font-size:1rem">✅</span>' : '<span style="font-size:.9rem;opacity:.2">○</span>')
+          ) + '</td>';
+      }).join('') +
+      '<td style="text-align:center;font-weight:700;font-size:.8rem;color:'+warna+'">'+totalBayar+'/'+pertemuan.length+'</td>' +
+      '<td style="text-align:center">'+(p.menang?'<span class="badge b-ok" style="font-size:.6rem">Menang</span>':'<span class="badge b-pr" style="font-size:.6rem">Belum</span>')+'</td>' +
+      (canEdit ? '<td><div class="flex" style="gap:.2rem">' +
+        (p.menang
+          ? '<button class="btn btn-o btn-xs" onclick="window.unmenang(''+p.id+'')">↩️</button>'
+          : '<button class="btn btn-ok btn-xs" onclick="window.manualMenang(''+p.id+'')">✅</button>') +
+        '<button class="btn btn-er btn-xs" onclick="window.dlPeserta(''+p.id+'')">🗑️</button>' +
+        '</div></td>' : '') +
+    '</tr>';
+  });
+
+  // Summary row
+  html += '<tr style="background:var(--sf2);font-weight:600;font-size:.75rem">' +
+    '<td class="sticky-col" style="background:var(--sf2);font-size:.72rem;color:var(--tx2)">TOTAL</td>' +
+    '<td></td>' +
+    ptToShow.map(pt => {
+      const cnt = ar.filter(p=>(p.riwayat_bayar||[]).some(b=>b.pertemuan_ke===pt.ke)).length;
+      const nom = ar.find(x=>x.nominal)?.nominal||0;
+      return '<td style="text-align:center;font-size:.68rem;padding:.3rem .2rem">' +
+        '<div style="font-weight:700;color:var(--pr)">'+cnt+'<span style="font-weight:400;color:var(--tx3)">/' + ar.length+'</span></div>' +
+        '<div style="color:var(--ok);font-size:.6rem">'+fm(cnt*nom)+'</div>' +
+      '</td>';
+    }).join('') +
+    '<td style="text-align:center;color:var(--ok);font-size:.78rem">'+ar.reduce((s,p)=>s+new Set((p.riwayat_bayar||[]).map(b=>b.pertemuan_ke)).size,0)+'x</td>' +
+    '<td></td>' +
+    (canEdit ? '<td></td>' : '') +
+  '</tr>';
+
+  html += '</tbody></table></div>';
+  return html;
 }
 
 // ── PERTEMUAN ARISAN ──────────────────────────────────────────
@@ -1103,15 +1214,17 @@ window.tambahPertemuan = async function() {
 window.kelolaPertemuan = function() {
   const pt = window._arisanPertemuan||[];
   const rows = pt.length
-    ? pt.map(p => `
-        <div class="flex items-center justify-between" style="padding:.35rem .55rem;border-radius:6px;background:var(--sf2);margin-bottom:.25rem">
+    ? pt.map(p => {
+        const pid = p.id || '';
+        return `<div class="flex items-center justify-between" style="padding:.35rem .55rem;border-radius:6px;background:var(--sf2);margin-bottom:.25rem">
           <div>
-            <span style="font-weight:600;font-size:.82rem">Pertemuan ke-${p.ke}</span>
+            <span style="font-weight:600;font-size:.82rem">Pertemuan ke-${p.ke||'?'}</span>
             <span style="font-size:.75rem;color:var(--tx2);margin-left:.4rem">${fd(p.tgl)}</span>
             ${p.ket?`<div style="font-size:.7rem;color:var(--tx2)">${esc(p.ket)}</div>`:''}
           </div>
-          <button class="btn btn-er btn-xs" onclick="window.hapusPertemuan('${p.id}',${p.ke},this)">🗑️</button>
-        </div>`).join('')
+          <button class="btn btn-er btn-xs" onclick="window.hapusPertemuan('${pid}',${p.ke||0},this)">🗑️</button>
+        </div>`;
+      }).join('')
     : '<div style="text-align:center;font-size:.82rem;color:var(--tx2);padding:.75rem">Belum ada pertemuan</div>';
 
   modal('⚙️ Kelola Pertemuan',

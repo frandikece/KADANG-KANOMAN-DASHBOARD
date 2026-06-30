@@ -60,7 +60,7 @@
 </div>
 
 <script type="module">
-import { getSession, clearSession, applyTheme, toggleTheme as tgTheme, fbSub, av, esc } from './js/firebase.js';
+import { getSession, clearSession, applyTheme, toggleTheme as tgTheme, fbSub, fbSubDoc, av, esc } from './js/firebase.js';
 import { renderPage, initPage } from './js/app.js';
 
 // ── THEME ──────────────────────────────────────────────────────
@@ -137,29 +137,39 @@ window.CA = { users:[], rapats:[], absensi:[], agenda:[], struktur:[], kas:[], a
 const cols = ['users','rapats','absensi','agenda','struktur','kas','arisan'];
 let loaded = 0;
 
+function rerenderCurrentPage() {
+  renderPage(window.currentPage, CU, window.CA);
+  if (window.currentPage === 'arisan') {
+    setTimeout(() => { if (window.initArisanWheel) window.initArisanWheel(); }, 80);
+  }
+}
+
 cols.forEach(col => {
   fbSub(col, data => {
     window.CA[col] = data;
     loaded++;
-    if (loaded >= cols.length) {
-      // All collections loaded at least once
-      renderPage(window.currentPage, CU, window.CA);
-  // Init arisan page - load pertemuan first then re-render with wheel
-  if (window.currentPage === 'arisan') {
-    if (window.loadArisanPertemuan) {
-      window.loadArisanPertemuan().then(() => {
-        renderPage(window.currentPage, window.CU, window.CA);
-        setTimeout(() => { if (window.initArisanWheel) window.initArisanWheel(); }, 100);
-      });
-    } else {
-      setTimeout(() => { if (window.initArisanWheel) window.initArisanWheel(); }, 100);
-    }
-  }
-    } else {
-      // Re-render on every realtime update after initial load
-      if (loaded > cols.length) renderPage(window.currentPage, CU, window.CA);
+    if (loaded === cols.length) {
+      // First full load — fetch pertemuan then render
+      if (window.loadArisanPertemuan) {
+        window.loadArisanPertemuan().then(rerenderCurrentPage);
+      } else {
+        rerenderCurrentPage();
+      }
+    } else if (loaded > cols.length) {
+      // Subsequent realtime updates
+      rerenderCurrentPage();
     }
   });
+});
+
+// ── ARISAN SPIN REALTIME SYNC ──────────────────────────────────
+// Allows non-admin/bendahara users to watch the wheel spin live
+fbSubDoc('meta', 'spin_state', state => {
+  if (window.currentPage !== 'arisan') return;
+  if (window._arisanCanEdit) return; // admin/bendahara handles their own spin animation
+  if (typeof window._handleSpinStateViewer === 'function') {
+    window._handleSpinStateViewer(state);
+  }
 });
 
 // ── BOOT ───────────────────────────────────────────────────────
