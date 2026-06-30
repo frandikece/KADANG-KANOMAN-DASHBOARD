@@ -863,9 +863,6 @@ window.initArisanWheel = function() {
 };
 
 // ── SPIN FUNCTIONS ────────────────────────────────────────────
-let _spinning = false;
-let _spinWinner = null;
-
 function _animateSpin(canvas, belum, winner, isAdmin) {
   _spinning = true;
   const n = belum.length;
