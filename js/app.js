@@ -1136,7 +1136,7 @@ function buildBukuArisanHTML(ar, canEdit) {
         return '<td style="text-align:center;padding:.3rem .2rem">' +
           (canEdit
             ? '<label class="pay-toggle-mini" title="'+(sudahBayar?'Sudah bayar ke-'+pt.ke+' — klik batal':'Belum bayar ke-'+pt.ke+' — klik tandai')+'">' +
-              '<input type="checkbox" '+(sudahBayar?'checked':'')+' onchange="window.toggleBayarPt(''+p.id+'','+pt.ke+',this.checked)">' +
+              '<input type="checkbox" '+(sudahBayar?'checked':'')+' onchange="window.toggleBayarPt(\''+p.id+'\','+pt.ke+',this.checked)">' +
               '<span class="ptm-track"></span>' +
               '</label>'
             : (sudahBayar ? '<span style="font-size:1rem">✅</span>' : '<span style="font-size:.9rem;opacity:.2">○</span>')
@@ -1146,9 +1146,9 @@ function buildBukuArisanHTML(ar, canEdit) {
       '<td style="text-align:center">'+(p.menang?'<span class="badge b-ok" style="font-size:.6rem">Menang</span>':'<span class="badge b-pr" style="font-size:.6rem">Belum</span>')+'</td>' +
       (canEdit ? '<td><div class="flex" style="gap:.2rem">' +
         (p.menang
-          ? '<button class="btn btn-o btn-xs" onclick="window.unmenang(''+p.id+'')">↩️</button>'
-          : '<button class="btn btn-ok btn-xs" onclick="window.manualMenang(''+p.id+'')">✅</button>') +
-        '<button class="btn btn-er btn-xs" onclick="window.dlPeserta(''+p.id+'')">🗑️</button>' +
+          ? '<button class="btn btn-o btn-xs" onclick="window.unmenang(\'' +p.id+ '\')">↩️</button>'
+          : '<button class="btn btn-ok btn-xs" onclick="window.manualMenang(\'' +p.id+ '\')">✅</button>') +
+        '<button class="btn btn-er btn-xs" onclick="window.dlPeserta(\'' +p.id+ '\')">🗑️</button>' +
         '</div></td>' : '') +
     '</tr>';
   });
